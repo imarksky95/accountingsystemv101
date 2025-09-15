@@ -1,5 +1,5 @@
 import React, { useContext, ReactElement } from 'react';
-import { HashRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { Route, Routes, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { UserProvider, UserContext } from './UserContext';
@@ -26,8 +26,7 @@ function ProtectedRoute({ children }: { children: ReactElement }) {
 
 function App() {
   return (
-    <Router>
-      <Routes>
+    <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route
@@ -110,8 +109,9 @@ function App() {
             </ProtectedRoute>
           }
         />
-      </Routes>
-    </Router>
+  {/* Fallback route for any other path */}
+  <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
