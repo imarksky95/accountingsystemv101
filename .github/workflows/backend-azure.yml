@@ -31,4 +31,4 @@ jobs:
         with:
           app-name: accountingsystemv101
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
-          package: .
+          package: ./backend
