@@ -27,8 +27,8 @@ jobs:
       # - name: Run tests
       #   run: npm test
 
-      - name: Build app
-        run: npm run build # Remove or modify if your project does not require a build step
+      # - name: Build app
+      #   run: npm run build # Removed for backend deployment, not needed
 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
