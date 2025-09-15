@@ -1,17 +1,12 @@
-// Simple endpoint to test CORS headers
-app.get('/api/test-cors', (req, res) => {
-  res.json({ message: 'CORS test successful!' });
-});
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// Set CORS for production deployment (allow GitHub Pages frontend)
+// Allow requests from your GitHub Pages domain
 app.use(cors({
   origin: 'https://imarksky95.github.io',
-  credentials: true
+  credentials: true // if you use cookies or HTTP authentication
 }));
 app.use(express.json());
 
