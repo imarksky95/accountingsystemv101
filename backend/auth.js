@@ -17,12 +17,18 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const sql = 'INSERT INTO users (username, password, role_id) VALUES (?, ?, ?)';
     const connection = await mysql.createConnection(getDbConfig(req));
-    await connection.execute(sql, [username, hashedPassword, role_id]);
+    try {
+      await connection.execute(sql, [username, hashedPassword, role_id]);
+    } catch (dbErr) {
+      console.error('DB error during registration:', dbErr);
+      // Log more details if possible
+      return res.status(500).json({ error: dbErr.message, code: dbErr.code, sqlMessage: dbErr.sqlMessage });
+    }
     await connection.end();
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
     console.error('Registration error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 

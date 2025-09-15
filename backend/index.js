@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const app = express();
 
 // Allow requests from your GitHub Pages domain
@@ -17,10 +18,13 @@ app.use('/api', companyProfileRoutes);
 // MySQL connection
 const mysql = require('mysql2/promise');
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASS || '',
+  host: process.env.DB_HOST || 'accountingsystemv101-server.mysql.database.azure.com',
+  user: process.env.DB_USER || 'qrkyjktnpw',
+  password: process.env.DB_PASS || '786599Dragonstreet!',
   database: process.env.DB_NAME || 'accounting_db',
+  ssl: {
+    ca: fs.readFileSync(__dirname + '/DigiCertGlobalRootCA.crt.pem')
+  }
 };
 app.set('dbConfig', dbConfig);
 
