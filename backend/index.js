@@ -18,7 +18,7 @@ app.use(express.json());
 
 // Database connection pool
 const dbPool = mysql.createPool({
-  host: process.env.DB_HOST || '127.0.0.1',
+  host: process.env.DB_HOST || '148.222.53.12',
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
