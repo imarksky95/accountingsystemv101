@@ -16,15 +16,13 @@ router.post('/register', async (req, res) => {
     // Hash the password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
     const sql = 'INSERT INTO users (username, password, role_id) VALUES (?, ?, ?)';
-    const connection = await mysql.createConnection(getDbConfig(req));
+    const dbPool = req.app.get('dbPool');
     try {
-      await connection.execute(sql, [username, hashedPassword, role_id]);
+      await dbPool.execute(sql, [username, hashedPassword, role_id]);
     } catch (dbErr) {
       console.error('DB error during registration:', dbErr);
-      // Log more details if possible
       return res.status(500).json({ error: dbErr.message, code: dbErr.code, sqlMessage: dbErr.sqlMessage });
     }
-    await connection.end();
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
     console.error('Registration error:', err);
@@ -37,9 +35,8 @@ router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ message: 'Missing fields' });
   try {
-    const connection = await mysql.createConnection(getDbConfig(req));
-    const [rows] = await connection.execute('SELECT * FROM users WHERE username = ?', [username]);
-    await connection.end();
+  const dbPool = req.app.get('dbPool');
+  const [rows] = await dbPool.execute('SELECT * FROM users WHERE username = ?', [username]);
     const user = rows[0];
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
     const match = await bcrypt.compare(password, user.password);
