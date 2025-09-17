@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:5000/api/auth';
+const API_URL = 'http://127.0.0.1:3000/api/auth';
 
 export async function register(username: string, password: string, role_id: number) {
   return axios.post(`${API_URL}/register`, { username, password, role_id });
