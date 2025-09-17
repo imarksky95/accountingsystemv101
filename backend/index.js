@@ -18,13 +18,10 @@ app.use('/api', companyProfileRoutes);
 // MySQL connection
 const mysql = require('mysql2/promise');
 const dbConfig = {
-  host: process.env.DB_HOST || 'accountingsystemv101-server.mysql.database.azure.com',
-  user: process.env.DB_USER || 'qrkyjktnpw',
-  password: process.env.DB_PASS || '786599Dragonstreet!',
-  database: process.env.DB_NAME || 'accounting_db',
-  ssl: {
-    ca: fs.readFileSync(__dirname + '/DigiCertGlobalRootCA.crt.pem')
-  }
+  host: '127.0.0.1',
+  user: 'u325151658_markchrc',
+  password: 'Mark_082020',
+  database: 'u325151658_accounting_db'
 };
 app.set('dbConfig', dbConfig);
 
