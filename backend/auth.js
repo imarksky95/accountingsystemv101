@@ -15,7 +15,7 @@ router.post('/register', async (req, res) => {
   try {
     // Hash the password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
-    const sql = 'INSERT INTO users (username, password, role_id) VALUES (?, ?, ?)';
+  const sql = 'INSERT INTO users (username, password_hash, role_id) VALUES (?, ?, ?)';
     const dbPool = req.app.get('dbPool');
     try {
       await dbPool.execute(sql, [username, hashedPassword, role_id]);
@@ -39,7 +39,7 @@ router.post('/login', async (req, res) => {
   const [rows] = await dbPool.execute('SELECT * FROM users WHERE username = ?', [username]);
     const user = rows[0];
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
-    const match = await bcrypt.compare(password, user.password);
+  const match = await bcrypt.compare(password, user.password_hash);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
     const token = jwt.sign({ user_id: user.user_id, role_id: user.role_id }, process.env.JWT_SECRET, { expiresIn: '1d' });
     // Return both token and user info (excluding password)
