@@ -2,14 +2,12 @@ const express = require('express');
 const router = express.Router();
 
 const mysql = require('mysql2/promise');
-const dbConfig = require('./index').dbConfig || require('./index').default?.dbConfig;
 
 // GET company profile
 router.get('/company-profile', async (req, res) => {
   try {
-    const connection = await mysql.createConnection(req.app.get('dbConfig'));
-    const [rows] = await connection.execute('SELECT * FROM company_profile WHERE id=1');
-    await connection.end();
+    const dbPool = req.app.get('dbPool');
+    const [rows] = await dbPool.execute('SELECT * FROM company_profile WHERE id=1');
     if (rows.length > 0) {
       res.json(rows[0]);
     } else {
