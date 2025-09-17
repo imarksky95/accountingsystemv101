@@ -1,60 +1,60 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const mysql = require('mysql2/promise');
 const router = express.Router();
-
-// Get db config from app
-function getDbConfig(req) {
-  return req.app.get('dbConfig');
-}
 
 // Register
 router.post('/register', async (req, res) => {
   console.log('Received POST /register', req.method, req.body);
   const { username, password, role_id } = req.body;
+  if (!username || !password || !role_id) {
+    return res.status(400).json({ message: 'Missing fields' });
+  }
   try {
-    // Hash the password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
-  const sql = 'INSERT INTO users (username, password_hash, role_id) VALUES (?, ?, ?)';
+    const sql = 'INSERT INTO users (username, password_hash, role_id) VALUES (?, ?, ?)';
     const dbPool = req.app.get('dbPool');
-    try {
-      await dbPool.execute(sql, [username, hashedPassword, role_id]);
-    } catch (dbErr) {
-      console.error('DB error during registration:', dbErr);
-      return res.status(500).json({ error: dbErr.message, code: dbErr.code, sqlMessage: dbErr.sqlMessage });
-    }
+
+    await dbPool.execute(sql, [username, hashedPassword, role_id]);
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({ error: err.message, stack: err.stack });
+    console.error('DB error during registration:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
 // Login
 router.post('/login', async (req, res) => {
   console.log('Received POST /login', req.method, req.body);
-  const { username, password_hash } = req.body;
-  if (!username || !password_hash) return res.status(400).json({ message: 'Missing fields' });
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).json({ message: 'Missing fields' });
+
   try {
-  const dbPool = req.app.get('dbPool');
-  const [rows] = await dbPool.execute('SELECT * FROM users WHERE username = ?', [username]);
+    const dbPool = req.app.get('dbPool');
+    const [rows] = await dbPool.execute('SELECT * FROM users WHERE username = ?', [username]);
     const user = rows[0];
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
-  const match = await bcrypt.compare(password, user.password_hash);
+
+    const match = await bcrypt.compare(password, user.password_hash);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
-    const token = jwt.sign({ user_id: user.user_id, role_id: user.role_id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    // Return both token and user info (excluding password)
+
+    const token = jwt.sign(
+      { user_id: user.user_id, role_id: user.role_id },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
     res.json({
       token,
       user: {
         user_id: user.user_id,
         username: user.username,
-        role_id: user.role_id
-      }
+        role_id: user.role_id,
+      },
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Login error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -63,6 +63,7 @@ function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) return res.sendStatus(401);
+
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.sendStatus(403);
     req.user = user;
@@ -73,13 +74,17 @@ function authenticateToken(req, res, next) {
 // Get current user info
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const connection = await mysql.createConnection(getDbConfig(req));
-    const [rows] = await connection.execute('SELECT user_id, username, role_id FROM users WHERE user_id = ?', [req.user.user_id]);
-    await connection.end();
+    const dbPool = req.app.get('dbPool');
+    const [rows] = await dbPool.execute(
+      'SELECT user_id, username, role_id FROM users WHERE user_id = ?',
+      [req.user.user_id]
+    );
     res.json(rows[0]);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Fetch user error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
 module.exports = router;
+
