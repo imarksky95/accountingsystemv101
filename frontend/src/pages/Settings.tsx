@@ -19,7 +19,8 @@ const Settings: React.FC = () => {
   });
   // Load company profile from backend on mount
   useEffect(() => {
-    fetch('/api/company-profile')
+  const API_BASE_URL = 'https://accountingsystemv101.onrender.com';
+  fetch(`${API_BASE_URL}/api/company-profile`)
       .then(res => res.json())
       .then(data => {
         setProfile(data);
@@ -54,7 +55,7 @@ const Settings: React.FC = () => {
 
   // Load company profile from backend on mount and after save
   const loadProfile = () => {
-    fetch('/api/company-profile')
+  fetch(`${API_BASE_URL}/api/company-profile`)
       .then(res => res.json())
       .then(data => {
         setProfile(data);
@@ -68,7 +69,7 @@ const Settings: React.FC = () => {
 
   const handleSave = async () => {
     // Save to backend
-    await fetch('/api/company-profile', {
+  await fetch(`${API_BASE_URL}/api/company-profile`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(profile),
