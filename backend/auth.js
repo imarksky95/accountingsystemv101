@@ -11,7 +11,7 @@ function getDbConfig(req) {
 
 // Register
 router.post('/register', async (req, res) => {
-  const { username, password_hash, role_id } = req.body;
+  const { username, password, role_id } = req.body;
   try {
     // Hash the password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
