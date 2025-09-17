@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { register } from '../auth';
 
 const Register: React.FC = () => {
@@ -7,6 +8,7 @@ const Register: React.FC = () => {
   const [roleId, setRoleId] = useState(2); // Default to 'user' role
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,6 +17,7 @@ const Register: React.FC = () => {
     try {
       await register(username, password, roleId);
       setSuccess('Registration successful! You can now log in.');
+      setTimeout(() => navigate('/login'), 1200);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed');
     }
