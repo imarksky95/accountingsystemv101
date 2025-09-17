@@ -11,7 +11,7 @@ function getDbConfig(req) {
 
 // Register
 router.post('/register', async (req, res) => {
-  const { username, password, role_id } = req.body;
+  const { username, password_hash, role_id } = req.body;
   try {
     // Hash the password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -32,8 +32,8 @@ router.post('/register', async (req, res) => {
 
 // Login
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ message: 'Missing fields' });
+  const { username, password_hash } = req.body;
+  if (!username || !password_hash) return res.status(400).json({ message: 'Missing fields' });
   try {
   const dbPool = req.app.get('dbPool');
   const [rows] = await dbPool.execute('SELECT * FROM users WHERE username = ?', [username]);
