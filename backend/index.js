@@ -12,6 +12,13 @@ app.use(cors({
 app.use(express.json());
 
 // Company Profile routes
+
+const cors = require('cors');
+app.use(cors({
+  origin: 'http://127.0.0.1:3000',
+  credentials: true
+}));
+
 const companyProfileRoutes = require('./companyProfile');
 app.use('/api', companyProfileRoutes);
 
