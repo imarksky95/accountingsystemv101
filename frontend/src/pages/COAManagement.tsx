@@ -70,9 +70,10 @@ const COAManagement: React.FC = () => {
   const [form, setForm] = useState({ account_number: '', account_name: '', account_type: '', parent_id: '' });
   const [parentOptions, setParentOptions] = useState<{ coa_id: number; account_name: string }[]>([]);
 
+  const API_BASE_URL = 'https://accountingsystemv101.onrender.com';
   const fetchAccounts = async () => {
     setLoading(true);
-    const res = await fetch('/api/coa');
+    const res = await fetch(`${API_BASE_URL}/api/coa`);
     let data;
     try {
       data = await res.json();
@@ -86,7 +87,7 @@ const COAManagement: React.FC = () => {
   };
 
   const fetchParentOptions = async () => {
-    const res = await fetch('/api/coa/all/simple');
+    const res = await fetch(`${API_BASE_URL}/api/coa/all/simple`);
     let data;
     try {
       data = await res.json();
@@ -144,13 +145,13 @@ const COAManagement: React.FC = () => {
     try {
       let response;
       if (editId) {
-        response = await fetch(`/api/coa/${editId}`, {
+        response = await fetch(`${API_BASE_URL}/api/coa/${editId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
       } else {
-        response = await fetch('/api/coa', {
+        response = await fetch(`${API_BASE_URL}/api/coa`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -173,7 +174,7 @@ const COAManagement: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    await fetch(`/api/coa/${id}`, { method: 'DELETE' });
+  await fetch(`${API_BASE_URL}/api/coa/${id}`, { method: 'DELETE' });
     await fetchAccounts();
     await fetchParentOptions(); // update parent dropdown immediately
   };
