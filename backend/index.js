@@ -2,54 +2,68 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
+const mysql = require('mysql2/promise');
+
 const app = express();
 
-// CORS middleware - load once, before all routes
+// CORS middleware - allow multiple origins for dev
+const allowedOrigins = [
+  'http://127.0.0.1:3000',
+  'http://localhost:3000'
+];
 app.use(cors({
-  origin: 'http://127.0.0.1:3000',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
 
+// Database connection pool
+const dbPool = mysql.createPool({
+  host: process.env.DB_HOST || '127.0.0.1',
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+app.set('dbPool', dbPool);
+
+// Routes
 const companyProfileRoutes = require('./companyProfile');
 app.use('/api', companyProfileRoutes);
 
-// MySQL connection
-const mysql = require('mysql2/promise');
-const dbConfig = {
-  host: '127.0.0.1',
-  user: 'u325151658_markchrc',
-  password: 'Mark_082020',
-  database: 'u325151658_accounting_db'
-};
-app.set('dbConfig', dbConfig);
-
-
-// Auth routes
 const authRoutes = require('./auth');
 app.use('/api/auth', authRoutes);
 
-// COA routes
 const coaRoutes = require('./coa');
 app.use('/api/coa', coaRoutes);
 
 // Role management (basic example)
-app.get('/api/roles', async (req, res) => {
+app.get('/api/roles', async (req, res, next) => {
   try {
-    const connection = await mysql.createConnection(dbConfig);
-    const [rows] = await connection.execute('SELECT * FROM roles');
-    await connection.end();
+    const [rows] = await dbPool.execute('SELECT * FROM roles');
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 });
 
+// 404 handler
+app.use((req, res, next) => {
+  res.status(404).json({ error: 'Route not found' });
+});
 
 // Global error logging middleware
 app.use((err, req, res, next) => {
   console.error('GLOBAL EXPRESS ERROR:', err);
-  res.status(500).json({ error: err.message || 'Internal Server Error' });
+  res.status(500).json({ error: 'Internal Server Error' });
 });
 
 // Test endpoint for connectivity
