@@ -7,21 +7,9 @@ const mysql = require('mysql2/promise');
 const app = express();
 
 // CORS middleware - allow multiple origins for dev
-const allowedOrigins = [
-  'http://127.0.0.1:3000',
-  'http://localhost:3000'
-];
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: true,
+  credentials: true
 }));
 
 // Explicitly handle preflight requests
