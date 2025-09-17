@@ -11,6 +11,7 @@ function getDbConfig(req) {
 
 // Register
 router.post('/register', async (req, res) => {
+  console.log('Received POST /register', req.method, req.body);
   const { username, password, role_id } = req.body;
   try {
     // Hash the password before saving
@@ -32,6 +33,7 @@ router.post('/register', async (req, res) => {
 
 // Login
 router.post('/login', async (req, res) => {
+  console.log('Received POST /login', req.method, req.body);
   const { username, password_hash } = req.body;
   if (!username || !password_hash) return res.status(400).json({ message: 'Missing fields' });
   try {
