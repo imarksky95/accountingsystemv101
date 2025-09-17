@@ -4,20 +4,12 @@ const cors = require('cors');
 const fs = require('fs');
 const app = express();
 
-// Allow requests from your GitHub Pages domain
-app.use(cors({
-  origin: 'https://imarksky95.github.io',
-  credentials: true // if you use cookies or HTTP authentication
-}));
-app.use(express.json());
-
-// Company Profile routes
-
-const cors = require('cors');
+// CORS middleware - load once, before all routes
 app.use(cors({
   origin: 'http://127.0.0.1:3000',
   credentials: true
 }));
+app.use(express.json());
 
 const companyProfileRoutes = require('./companyProfile');
 app.use('/api', companyProfileRoutes);
