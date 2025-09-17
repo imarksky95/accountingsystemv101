@@ -9,6 +9,9 @@ const companyTypes = [
   'Non Profit Organization',
 ];
 
+//API base recognition
+const API_BASE_URL = 'https://accountingsystemv101.onrender.com';
+
 const Settings: React.FC = () => {
   const [profile, setProfile] = useState({
     logo: '',
@@ -19,8 +22,7 @@ const Settings: React.FC = () => {
   });
   // Load company profile from backend on mount
   useEffect(() => {
-  const API_BASE_URL = 'https://accountingsystemv101.onrender.com';
-  fetch(`${API_BASE_URL}/api/company-profile`)
+    fetch(`${API_BASE_URL}/api/company-profile`)
       .then(res => res.json())
       .then(data => {
         setProfile(data);

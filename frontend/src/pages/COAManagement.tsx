@@ -7,6 +7,10 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 
+// API base recognition
+const API_BASE_URL = 'https://accountingsystemv101.onrender.com';
+
+
 // Predefined account types grouped by category
 const ACCOUNT_TYPE_OPTIONS = [
   {
@@ -70,7 +74,6 @@ const COAManagement: React.FC = () => {
   const [form, setForm] = useState({ account_number: '', account_name: '', account_type: '', parent_id: '' });
   const [parentOptions, setParentOptions] = useState<{ coa_id: number; account_name: string }[]>([]);
 
-  const API_BASE_URL = 'https://accountingsystemv101.onrender.com';
   const fetchAccounts = async () => {
     setLoading(true);
     const res = await fetch(`${API_BASE_URL}/api/coa`);
