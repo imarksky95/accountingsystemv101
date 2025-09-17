@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'https://accountingsystemv101.onrender.com/api/auth';
+const API_URL = 'https://accountingsystemv101.onrender.com';
 
 export async function register(username: string, password: string, role_id: number) {
   return axios.post(`${API_URL}/register`, { username, password, role_id });
