@@ -7,6 +7,7 @@ function getDbPool(req) {
 }
 
 // List all COA entries with parent account name, only not deleted
+router.get('/', async (req, res) => {
   try {
     const dbPool = getDbPool(req);
     const [rows] = await dbPool.execute(`
@@ -24,6 +25,7 @@ function getDbPool(req) {
 });
 
 // Add a new COA entry (with manual account_number and optional parent_id)
+router.post('/', async (req, res) => {
   const { account_number, account_name, account_type, parent_id } = req.body;
   if (!account_number) return res.status(400).json({ error: 'Account Number is required' });
   try {
