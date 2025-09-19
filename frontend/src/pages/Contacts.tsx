@@ -6,7 +6,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 
-const API_BASE_URL = 'https://accountingsystemv101.onrender.com';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101.onrender.com';
 
 interface Contact {
   contact_id: number;

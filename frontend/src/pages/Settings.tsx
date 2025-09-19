@@ -9,8 +9,8 @@ const companyTypes = [
   'Non Profit Organization',
 ];
 
-//API base recognition
-const API_BASE_URL = 'https://accountingsystemv101.onrender.com';
+//API base recognition (can be overridden at build time)
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101.onrender.com';
 
 const Settings: React.FC = () => {
   const [profile, setProfile] = useState({
