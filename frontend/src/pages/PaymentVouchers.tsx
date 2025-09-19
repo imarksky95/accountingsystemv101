@@ -66,29 +66,7 @@ const PaymentVouchers: React.FC = () => {
   const openNew = () => { setEditing(null); setForm({ ...emptyForm, preparation_date: new Date().toISOString().slice(0,10), prepared_by: user?.user_id || null }); setOpen(true); };
   const openEdit = (pv: any) => { setEditing(pv); setForm({ ...pv }); setOpen(true); };
 
-  const save = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const payload = { ...form, prepared_by: form.prepared_by || user?.user_id || null };
-      // If payee was selected from contacts, ensure we send the contact_id as string
-      if (form.payee) payload.payee = String(form.payee);
-      if (editing) {
-        await axios.put(`${API_BASE}/api/payment-vouchers/${editing.payment_voucher_id}`, payload, { headers: { Authorization: `Bearer ${token}` } });
-        setSnackMsg('Payment voucher updated');
-      } else {
-        await axios.post(`${API_BASE}/api/payment-vouchers`, payload, { headers: { Authorization: `Bearer ${token}` } });
-        setSnackMsg('Payment voucher created');
-      }
-      setSnackSeverity('success');
-      setSnackOpen(true);
-      setOpen(false);
-      fetchAll();
-    } catch (e:any) {
-      setSnackMsg(e.response?.data?.error || e.message || 'Save failed');
-      setSnackSeverity('error');
-      setSnackOpen(true);
-    }
-  };
+  
 
   const confirmDelete = (id: number) => { setDeleteId(id); setConfirmOpen(true); };
   const doDelete = async () => {
@@ -179,40 +157,158 @@ const PaymentVouchers: React.FC = () => {
         <Button variant="contained" color="primary" onClick={createDR} disabled={creatingDR}>{creatingDR ? <><CircularProgress size={16} /> Creating...</> : 'Create DR from selected'}</Button>
       </div>
 
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
+      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="lg">
         <DialogTitle>{editing ? 'Edit Payment Voucher' : 'New Payment Voucher'}<IconButton aria-label="close" onClick={() => setOpen(false)} sx={{position:'absolute', right:8, top:8}}><CloseIcon /></IconButton></DialogTitle>
         <DialogContent>
-          <FormControl fullWidth sx={{mt:1}}>
+          {/* Basic Details */}
+          <Box sx={{display:'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb:2}}>
             <TextField label="Preparation Date" type="date" value={form.preparation_date || ''} onChange={e => setForm({...form, preparation_date: e.target.value})} InputLabelProps={{ shrink: true }} />
-          </FormControl>
-          <FormControl fullWidth sx={{mt:1}}>
-            <TextField label="Purpose" value={form.purpose || ''} onChange={e => setForm({...form, purpose: e.target.value})} />
-          </FormControl>
-          <FormControl fullWidth sx={{mt:1}}>
-            <InputLabel id="payee-label">Payee</InputLabel>
-            <Select labelId="payee-label" value={String(form.payee || form.payee_id || '')} label="Payee" onChange={e => setForm({...form, payee: e.target.value})}>
-              <MenuItem value="">-- Select Payee --</MenuItem>
-              {contacts.map(c => <MenuItem key={c.contact_id} value={String(c.contact_id)}>{c.display_name}</MenuItem>)}
-            </Select>
-            <div style={{marginTop:8}}><Button size="small" onClick={() => window.location.href = '/contacts'}>Add New Contact</Button></div>
-          </FormControl>
-          <FormControl fullWidth sx={{mt:1}}>
-            <InputLabel id="coa-label">Chart of Accounts</InputLabel>
-            <Select labelId="coa-label" value={form.coa_id || ''} label="Chart of Accounts" onChange={e => setForm({...form, coa_id: e.target.value})}>
-              <MenuItem value="">-- Select COA --</MenuItem>
-              {coas.map((a:any) => <MenuItem key={a.coa_id} value={a.coa_id}>{a.account_name || a.name || `${a.coa_id}`}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth sx={{mt:1}}>
-            <TextField label="Amount" type="number" value={form.amount_to_pay || ''} onChange={e => setForm({...form, amount_to_pay: e.target.value})} />
-          </FormControl>
-          <FormControl fullWidth sx={{mt:1}}>
-            <TextField label="Description" value={form.description || ''} onChange={e => setForm({...form, description: e.target.value})} multiline rows={3} />
-          </FormControl>
+            <FormControl>
+              <InputLabel id="purpose-label">Purpose</InputLabel>
+              <Select labelId="purpose-label" value={form.purpose || ''} label="Purpose" onChange={e => setForm({...form, purpose: e.target.value})}>
+                <MenuItem value="">-- Select Purpose --</MenuItem>
+                <MenuItem value="Bills Payment">Bills Payment</MenuItem>
+                <MenuItem value="Liquidation Payouts">Liquidation Payouts</MenuItem>
+                <MenuItem value="Government and Other Agency Payments">Government and Other Agency Payments</MenuItem>
+                <MenuItem value="OSM Request">OSM Request</MenuItem>
+                <MenuItem value="Cash Advance / Budget Request">Cash Advance / Budget Request</MenuItem>
+                <MenuItem value="Other Payments">Other Payments</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          {/* Payment Details - dynamic rows */}
+          <Box sx={{mt:2, mb:2}}>
+            <Box sx={{fontWeight:700, mb:1}}>PAYMENT DETAILS</Box>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Payee</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell align="right">Amount to Pay</TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(form.payment_lines || []).map((line:any, idx:number) => (
+                  <TableRow key={idx}>
+                    <TableCell sx={{minWidth:200}}>
+                      <Select fullWidth value={line.payee_id || line.payee || ''} onChange={e => {
+                        const v = e.target.value; const copy = {...form}; copy.payment_lines[idx].payee_id = v; copy.payment_lines[idx].payee_name = contacts.find(c=>String(c.contact_id)===String(v))?.display_name || '' ; setForm(copy);
+                      }}>
+                        <MenuItem value="">-- Select Payee --</MenuItem>
+                        {contacts.map(c => <MenuItem key={c.contact_id} value={String(c.contact_id)}>{c.display_name}</MenuItem>)}
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <TextField fullWidth value={line.description || ''} onChange={e => { const copy = {...form}; copy.payment_lines[idx].description = e.target.value; setForm(copy); }} />
+                    </TableCell>
+                    <TableCell align="right">
+                      <TextField type="number" value={line.amount || ''} onChange={e => { const copy = {...form}; copy.payment_lines[idx].amount = e.target.value; setForm(copy); }} InputProps={{ sx: { textAlign: 'right' } }} />
+                    </TableCell>
+                    <TableCell>
+                      <Button color="error" onClick={() => { const copy = {...form}; copy.payment_lines = copy.payment_lines.filter((_:any,i:number)=>i!==idx); setForm(copy); }}>Remove</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <Box sx={{mt:1}}>
+              <Button onClick={() => { const copy = {...form}; copy.payment_lines = copy.payment_lines || []; copy.payment_lines.push({payee_id:'', description:'', amount:0}); setForm(copy); }}>+ Add another line</Button>
+            </Box>
+            <Box sx={{mt:2, textAlign:'right', fontWeight:700}}>Total Amount to Pay: PHP {(form.payment_lines || []).reduce((s:any,l:any)=>s + (Number(l.amount)||0), 0)}</Box>
+          </Box>
+
+          {/* Journal Entry - dynamic rows */}
+          <Box sx={{mt:2, mb:2}}>
+            <Box sx={{fontWeight:700, mb:1}}>JOURNAL ENTRY</Box>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>COA</TableCell>
+                  <TableCell>Debit</TableCell>
+                  <TableCell>Credit</TableCell>
+                  <TableCell>Remarks</TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(form.journal_lines || []).map((line:any, idx:number) => (
+                  <TableRow key={idx}>
+                    <TableCell sx={{minWidth:200}}>
+                      <Select fullWidth value={line.coa_id || ''} onChange={e => { const copy = {...form}; copy.journal_lines[idx].coa_id = e.target.value; setForm(copy); }}>
+                        <MenuItem value="">-- Select COA --</MenuItem>
+                        {coas.map((a:any) => <MenuItem key={a.coa_id} value={a.coa_id}>{a.account_name || a.name || a.coa_id}</MenuItem>)}
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <TextField fullWidth value={line.debit || ''} onChange={e => { const copy = {...form}; copy.journal_lines[idx].debit = e.target.value; setForm(copy); }} InputProps={{ sx: { textAlign: 'right' } }} />
+                    </TableCell>
+                    <TableCell>
+                      <TextField fullWidth value={line.credit || ''} onChange={e => { const copy = {...form}; copy.journal_lines[idx].credit = e.target.value; setForm(copy); }} InputProps={{ sx: { textAlign: 'right' } }} />
+                    </TableCell>
+                    <TableCell>
+                      <TextField fullWidth value={line.remarks || ''} onChange={e => { const copy = {...form}; copy.journal_lines[idx].remarks = e.target.value; setForm(copy); }} />
+                    </TableCell>
+                    <TableCell>
+                      <Button color="error" onClick={() => { const copy = {...form}; copy.journal_lines = copy.journal_lines.filter((_:any,i:number)=>i!==idx); setForm(copy); }}>Remove</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <Box sx={{mt:1}}>
+              <Button onClick={() => { const copy = {...form}; copy.journal_lines = copy.journal_lines || []; copy.journal_lines.push({coa_id:'', debit:0, credit:0, remarks:''}); setForm(copy); }}>+ Add another line</Button>
+            </Box>
+            <Box sx={{mt:2, textAlign:'right'}}>
+              <div><strong>Total Debit</strong> PHP {(form.journal_lines || []).reduce((s:any,l:any)=>s + (Number(l.debit)||0), 0)}</div>
+              <div><strong>Total Credit</strong> PHP {(form.journal_lines || []).reduce((s:any,l:any)=>s + (Number(l.credit)||0), 0)}</div>
+            </Box>
+          </Box>
+
+          {/* Signatories */}
+          <Box sx={{mt:2, mb:2}}>
+            <Box sx={{fontWeight:700, mb:1}}>SIGNATORIES</Box>
+            <Box sx={{display:'grid', gridTemplateColumns: '1fr 1fr 1fr', gap:2}}>
+              <TextField label="Prepared By" value={user?.username || ''} disabled />
+              <TextField label="Reviewed By" value={form.reviewed_by || ''} onChange={e => setForm({...form, reviewed_by: e.target.value})} />
+              <TextField label="Approved By" value={form.approved_by || ''} onChange={e => setForm({...form, approved_by: e.target.value})} />
+            </Box>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={save} variant="contained">Save</Button>
+          <Button onClick={async () => {
+            // Validation rules
+            if (!form.purpose) { setSnackMsg('Purpose is required'); setSnackSeverity('error'); setSnackOpen(true); return; }
+            if (!form.payment_lines || form.payment_lines.length === 0) { setSnackMsg('At least one payment line is required'); setSnackSeverity('error'); setSnackOpen(true); return; }
+            if (!form.journal_lines || form.journal_lines.length < 2) { setSnackMsg('At least two journal entry lines are required'); setSnackSeverity('error'); setSnackOpen(true); return; }
+            if (!form.reviewed_by || !form.approved_by) { setSnackMsg('Reviewed by and Approved by must be filled'); setSnackSeverity('error'); setSnackOpen(true); return; }
+            // Totals check optional: ensure debit == credit
+            const totalDebit = (form.journal_lines || []).reduce((s:any,l:any)=>s + (Number(l.debit)||0), 0);
+            const totalCredit = (form.journal_lines || []).reduce((s:any,l:any)=>s + (Number(l.credit)||0), 0);
+            if (totalDebit !== totalCredit) { setSnackMsg('Total Debit and Total Credit must be equal'); setSnackSeverity('error'); setSnackOpen(true); return; }
+            // Prepare payload mapping lines to expected backend fields (flatten payment_lines into a simplified array)
+            const payload = {
+              status: form.status || 'Draft',
+              preparation_date: form.preparation_date,
+              purpose: form.purpose,
+              paid_through: form.paid_through || 'Bank',
+              prepared_by: user?.user_id || null,
+              amount_to_pay: (form.payment_lines || []).reduce((s:any,l:any)=>s + (Number(l.amount)||0), 0),
+              description: form.description || '',
+              payment_lines: (form.payment_lines || []).map((l:any) => ({ payee: String(l.payee_id || l.payee || ''), description: l.description, amount: Number(l.amount) })),
+              journal_lines: (form.journal_lines || []).map((l:any) => ({ coa_id: l.coa_id || null, debit: Number(l.debit)||0, credit: Number(l.credit)||0, remarks: l.remarks || '' })),
+              reviewed_by: form.reviewed_by,
+              approved_by: form.approved_by
+            };
+            try {
+              const token = localStorage.getItem('token');
+              if (editing) await axios.put(`${API_BASE}/api/payment-vouchers/${editing.payment_voucher_id}`, payload, { headers: { Authorization: `Bearer ${token}` } });
+              else await axios.post(`${API_BASE}/api/payment-vouchers`, payload, { headers: { Authorization: `Bearer ${token}` } });
+              setSnackMsg(editing ? 'Payment Voucher updated' : 'Payment Voucher created'); setSnackSeverity('success'); setSnackOpen(true); setOpen(false); fetchAll();
+            } catch (err:any) { setSnackMsg(err.response?.data?.error || err.message || 'Save failed'); setSnackSeverity('error'); setSnackOpen(true); }
+          }} variant="contained">Save</Button>
         </DialogActions>
       </Dialog>
 
