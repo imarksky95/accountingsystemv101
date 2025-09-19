@@ -145,7 +145,7 @@ const Contacts: React.FC = () => {
             disabled={!editId}
             helperText={!editId ? 'Auto-generated' : ''}
           />
-          <TextField margin="dense" label="Display Name" name="display_name" value={form.display_name} onChange={(e) => setForm({...form, display_name: e.target.value})} fullWidth />
+          <TextField autoFocus margin="dense" label="Display Name" name="display_name" value={form.display_name} onChange={(e) => setForm({...form, display_name: e.target.value})} fullWidth />
           <FormControl fullWidth margin="dense">
             <InputLabel id="contact-type-label">Contact Type</InputLabel>
             <Select labelId="contact-type-label" name="contact_type" value={form.contact_type} label="Contact Type" onChange={(e:any) => setForm({...form, contact_type: e.target.value})}>
@@ -164,7 +164,7 @@ const Contacts: React.FC = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>Are you sure you want to delete this contact?</DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+          <Button autoFocus onClick={() => setConfirmOpen(false)}>Cancel</Button>
           <Button color="error" onClick={confirmDelete}>Delete</Button>
         </DialogActions>
       </Dialog>
