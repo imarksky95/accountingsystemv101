@@ -52,16 +52,18 @@ const Contacts: React.FC = () => {
   const handleClose = () => { setOpen(false); setEditId(null); };
 
   const handleSubmit = async () => {
-    const payload = { ...form };
     try {
       let res;
       if (editId) {
+        const payload: any = { display_name: form.display_name, contact_type: form.contact_type, contact_info: form.contact_info };
+        if (form.contact_control) payload.contact_control = form.contact_control;
         res = await window.fetch(`${API_BASE_URL}/api/contacts/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       } else {
+        const payload = { display_name: form.display_name, contact_type: form.contact_type, contact_info: form.contact_info };
         res = await window.fetch(`${API_BASE_URL}/api/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       }
-  if (!res.ok) throw new Error('Save failed');
-  await fetchContacts();
+      if (!res.ok) throw new Error('Save failed');
+      await fetchContacts();
       handleClose();
     } catch (e) {
       alert('Save failed');
@@ -119,7 +121,16 @@ const Contacts: React.FC = () => {
       <Dialog open={open} onClose={handleClose}>
         <DialogTitle>{editId ? 'Edit Contact' : 'Add Contact'}</DialogTitle>
         <DialogContent>
-          <TextField margin="dense" label="Contact Control #" name="contact_control" value={form.contact_control} onChange={(e) => setForm({...form, contact_control: e.target.value})} fullWidth />
+          <TextField
+            margin="dense"
+            label="Contact Control #"
+            name="contact_control"
+            value={form.contact_control}
+            onChange={(e) => setForm({...form, contact_control: e.target.value})}
+            fullWidth
+            disabled={!editId}
+            helperText={!editId ? 'Auto-generated' : ''}
+          />
           <TextField margin="dense" label="Display Name" name="display_name" value={form.display_name} onChange={(e) => setForm({...form, display_name: e.target.value})} fullWidth />
           <FormControl fullWidth margin="dense">
             <InputLabel id="contact-type-label">Contact Type</InputLabel>

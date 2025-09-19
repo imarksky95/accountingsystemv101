@@ -70,7 +70,7 @@ function App() {
           }
         />
         <Route
-          path="/clients-vendors"
+          path="/contacts"
           element={
             <ProtectedRoute>
               <DashboardLayout>

@@ -18,7 +18,7 @@ const navItems = [
   { text: 'Banking Management', icon: <AccountBalanceIcon />, path: '/banking' },
   { text: 'AP Management', icon: <PaymentIcon />, path: '/ap' },
   { text: 'AR Management', icon: <ReceiptIcon />, path: '/ar' },
-  { text: 'Client & Vendor Management', icon: <PeopleIcon />, path: '/clients-vendors' },
+  { text: 'Contacts', icon: <PeopleIcon />, path: '/contacts' },
   { text: 'Chart of Accounts', icon: <ListAltIcon />, path: '/coa' },
   { text: 'Payroll', icon: <PaidIcon />, path: '/payroll' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
