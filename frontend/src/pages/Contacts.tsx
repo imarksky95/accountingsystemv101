@@ -56,13 +56,19 @@ const Contacts: React.FC = () => {
   const handleSubmit = async () => {
     try {
       let res;
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('You must be logged in to perform this action.');
+        return;
+      }
+      const authHeader = { Authorization: `Bearer ${token}` };
       if (editId) {
         const payload: any = { display_name: form.display_name, contact_type: form.contact_type, contact_info: form.contact_info };
         if (form.contact_control) payload.contact_control = form.contact_control;
-        res = await window.fetch(`${API_BASE_URL}/api/contacts/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        res = await window.fetch(`${API_BASE_URL}/api/contacts/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(payload) });
       } else {
         const payload = { display_name: form.display_name, contact_type: form.contact_type, contact_info: form.contact_info };
-        res = await window.fetch(`${API_BASE_URL}/api/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        res = await window.fetch(`${API_BASE_URL}/api/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(payload) });
       }
       if (!res.ok) throw new Error('Save failed');
       await fetchContacts();

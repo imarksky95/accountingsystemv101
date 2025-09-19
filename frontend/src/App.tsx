@@ -8,7 +8,7 @@ import DashboardLayout from './components/DashboardLayout';
 import BankingManagement from './pages/BankingManagement';
 import APManagement from './pages/APManagement';
 import ARManagement from './pages/ARManagement';
-import ClientVendorManagement from './pages/ClientVendorManagement';
+import Contacts from './pages/Contacts';
 import ChartOfAccounts from './pages/ChartOfAccounts';
 import Payroll from './pages/Payroll';
 import Settings from './pages/Settings';
@@ -74,7 +74,7 @@ function App() {
           element={
             <ProtectedRoute>
               <DashboardLayout>
-                <ClientVendorManagement />
+                <Contacts />
               </DashboardLayout>
             </ProtectedRoute>
           }
