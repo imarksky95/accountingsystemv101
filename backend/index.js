@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
@@ -38,6 +39,19 @@ app.use('/api/auth', authRoutes);
 const coaRoutes = require('./coa');
 app.use('/api/coa', coaRoutes);
 
+// AP Management routes
+const paymentVoucherRoutes = require('./paymentVoucher');
+app.use('/api/payment-vouchers', paymentVoucherRoutes);
+
+const checkVoucherRoutes = require('./checkVoucher');
+app.use('/api/check-vouchers', checkVoucherRoutes);
+
+const scheduledPaymentRoutes = require('./scheduledPayment');
+app.use('/api/scheduled-payments', scheduledPaymentRoutes);
+
+const disbursementReportRoutes = require('./disbursementReport');
+app.use('/api/disbursement-reports', disbursementReportRoutes);
+
 // Role management (basic example)
 app.get('/api/roles', async (req, res, next) => {
   try {
@@ -69,6 +83,10 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
