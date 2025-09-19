@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCrud } from '../hooks/useCrud';
 import axios from 'axios';
+import { Snackbar, Alert, CircularProgress } from '@mui/material';
 
 export default function DisbursementReports() {
   const { data: reports, loading, error, fetchAll } = useCrud<any>({ endpoint: '/api/disbursement-reports' });
@@ -14,7 +15,12 @@ export default function DisbursementReports() {
     axios.get('/api/payment-vouchers').then(r => setPvList(r.data)).catch(() => {});
   }, []);
 
-  React.useEffect(() => { fetchAll(); }, []);
+  React.useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Snackbar state
+  const [snackOpen, setSnackOpen] = useState(false);
+  const [snackMsg, setSnackMsg] = useState('');
+  const [snackSeverity, setSnackSeverity] = useState<'success'|'error'|'info'>('info');
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error loading reports</div>;
@@ -41,25 +47,35 @@ export default function DisbursementReports() {
           <div>
             <button disabled={creating} onClick={async () => {
               const ids = Object.keys(selected).filter(k=>selected[+k]).map(k=>+k);
-              if (ids.length === 0) return alert('Select at least one PV');
+              if (ids.length === 0) {
+                setSnackMsg('Select at least one PV');
+                setSnackSeverity('info');
+                setSnackOpen(true);
+                return;
+              }
+              const amount_to_pay = pvList.filter(p => ids.includes(p.payment_voucher_id)).reduce((s, p) => s + (Number(p.amount_to_pay) || 0), 0);
               setCreating(true);
               try {
                 const token = localStorage.getItem('token');
-                await axios.post('/api/disbursement-reports', {
+                const resp = await axios.post('/api/disbursement-reports', {
                   status: 'Draft',
                   disbursement_date: new Date().toISOString().slice(0,10),
                   purpose: 'Bulk created from UI',
-                  amount_to_pay: 0,
+                  amount_to_pay,
                   paid_through: 'Bank',
                   voucher_ids: ids
                 }, { headers: { Authorization: `Bearer ${token}` } });
-                alert('Disbursement Report created');
+                setSnackMsg('Disbursement Report created');
+                setSnackSeverity('success');
+                setSnackOpen(true);
                 fetchAll();
                 setSelected({});
               } catch (e:any) {
-                alert(e.response?.data?.error || e.message || 'Create failed');
+                setSnackMsg(e.response?.data?.error || e.message || 'Create failed');
+                setSnackSeverity('error');
+                setSnackOpen(true);
               } finally { setCreating(false); }
-            }}>Create DR from selected</button>
+            }}>{creating ? <><CircularProgress size={16} /> Creating...</> : 'Create DR from selected'}</button>
           </div>
         </div>
         <div style={{flex:2}}>
@@ -104,6 +120,9 @@ export default function DisbursementReports() {
           </ul>
         </div>
       </div>
+      <Snackbar open={snackOpen} autoHideDuration={4000} onClose={() => setSnackOpen(false)}>
+        <Alert severity={snackSeverity} sx={{ width: '100%' }}>{snackMsg}</Alert>
+      </Snackbar>
     </div>
   );
 }

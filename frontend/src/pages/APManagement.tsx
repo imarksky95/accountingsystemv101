@@ -1,3 +1,11 @@
 import React from 'react';
-const APManagement: React.FC = () => <h2>AP Management Module</h2>;
+import DisbursementReports from './DisbursementReports';
+
+const APManagement: React.FC = () => (
+	<div>
+		<h2>AP Management Module</h2>
+		<DisbursementReports />
+	</div>
+);
+
 export default APManagement;
