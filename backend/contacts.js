@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const authenticateToken = require('./middleware/authenticate');
 
 // GET /api/contacts
 router.get('/', async (req, res, next) => {
@@ -13,7 +14,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // POST /api/contacts
-router.post('/', async (req, res, next) => {
+router.post('/', authenticateToken, async (req, res, next) => {
   try {
     const dbPool = req.app.get('dbPool');
     const { contact_control, display_name, contact_type, contact_info } = req.body;
@@ -44,7 +45,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // PUT /api/contacts/:id
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
     const dbPool = req.app.get('dbPool');
     const id = req.params.id;
@@ -62,7 +63,7 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // DELETE /api/contacts/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
     const dbPool = req.app.get('dbPool');
     const id = req.params.id;

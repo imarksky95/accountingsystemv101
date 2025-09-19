@@ -24,6 +24,8 @@ const Contacts: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [confirmId, setConfirmId] = useState<number | null>(null);
   const [form, setForm] = useState({ contact_control: '', display_name: '', contact_type: '', contact_info: '' });
 
   const fetchContacts = async () => {
@@ -71,10 +73,16 @@ const Contacts: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (!confirm('Delete this contact?')) return;
+    setConfirmId(id);
+    setConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!confirmId) return;
     try {
-  await window.fetch(`${API_BASE_URL}/api/contacts/${id}`, { method: 'DELETE' });
+      await window.fetch(`${API_BASE_URL}/api/contacts/${confirmId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
+      setConfirmOpen(false);
+      setConfirmId(null);
       await fetchContacts();
     } catch (e) {
       alert('Delete failed');
@@ -144,6 +152,14 @@ const Contacts: React.FC = () => {
         <DialogActions>
           <Button onClick={handleClose}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained">{editId ? 'Update' : 'Add'}</Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>Are you sure you want to delete this contact?</DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+          <Button color="error" onClick={confirmDelete}>Delete</Button>
         </DialogActions>
       </Dialog>
     </Box>

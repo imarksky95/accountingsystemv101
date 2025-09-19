@@ -6,10 +6,10 @@ async function main() {
   const envPath = path.resolve(__dirname, '../backend/.env');
   const env = fs.existsSync(envPath) ? fs.readFileSync(envPath,'utf8').split(/\r?\n/).reduce((acc,line)=>{const t=line.trim(); if(!t||t.startsWith('#')) return acc; const i=t.indexOf('='); if(i===-1) return acc; acc[t.slice(0,i)]=t.slice(i+1); return acc;},{}) : process.env;
   const pool = await mysql.createPool({
-    host: env.DB_HOST || 'localhost',
-    user: env.DB_USER || 'root',
-    password: env.DB_PASS || '',
-    database: env.DB_NAME || 'accounting_db',
+    host: env.DB_HOST || '148.222.53.12',
+    user: env.DB_USER || 'u325151658_markchrc',
+    password: env.DB_PASS || 'Mark_082020',
+    database: env.DB_NAME || 'u325151658_accounting_db',
     waitForConnections: true,
     connectionLimit: 5
   });
