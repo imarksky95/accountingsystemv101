@@ -2,7 +2,7 @@ import React, { useContext, ReactElement } from 'react';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import { UserProvider, UserContext } from './UserContext';
+import { UserContext } from './UserContext';
 
 import DashboardLayout from './components/DashboardLayout';
 import BankingManagement from './pages/BankingManagement';

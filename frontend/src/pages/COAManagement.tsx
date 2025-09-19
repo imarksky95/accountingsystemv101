@@ -107,6 +107,11 @@ const COAManagement: React.FC = () => {
   }, []);
 
   const handleOpen = (entry?: COAEntry) => {
+    // Ensure any currently focused element is blurred before opening a dialog
+    const maybeBlurActiveElement = () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    };
+    maybeBlurActiveElement();
     if (entry) {
       setEditId(entry.coa_id);
       setForm({

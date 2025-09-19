@@ -57,7 +57,7 @@ export default function DisbursementReports() {
               setCreating(true);
               try {
                 const token = localStorage.getItem('token');
-                const resp = await axios.post('/api/disbursement-reports', {
+                await axios.post('/api/disbursement-reports', {
                   status: 'Draft',
                   disbursement_date: new Date().toISOString().slice(0,10),
                   purpose: 'Bulk created from UI',

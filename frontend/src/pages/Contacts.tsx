@@ -42,6 +42,11 @@ const Contacts: React.FC = () => {
   useEffect(() => { fetchContacts(); }, []);
 
   const handleOpen = (it?: Contact) => {
+    // Blur any currently focused element to avoid aria-hidden warnings
+    const maybeBlurActiveElement = () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    };
+    maybeBlurActiveElement();
     if (it) {
       setEditId(it.contact_id);
       setForm({ contact_control: it.contact_control, display_name: it.display_name, contact_type: it.contact_type || '', contact_info: it.contact_info || '' });
@@ -79,6 +84,8 @@ const Contacts: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
+    // Blur active element before opening confirm dialog to prevent aria-hidden focus issues
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     setConfirmId(id);
     setConfirmOpen(true);
   };
