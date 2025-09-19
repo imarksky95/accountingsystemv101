@@ -7,10 +7,27 @@ const mysql = require('mysql2/promise');
 
 const app = express();
 
-// CORS middleware - allow multiple origins for dev
+// CORS middleware - allow specific origins (reflecting true for allowed list)
+const allowedOrigins = [
+  process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
+  'https://imarksky95.github.io',
+  'https://imarksky95.github.io/accountingsystemv101',
+  'https://accountingsystemv101.onrender.com'
+];
+
 app.use(cors({
-  origin: true,
-  credentials: true
+  origin: function(origin, callback) {
+    // allow requests with no origin (like mobile apps, curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    } else {
+      console.warn('Blocked CORS request from origin:', origin);
+      return callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 
 
