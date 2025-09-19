@@ -1,4 +1,3 @@
-import React from 'react';
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { TextField, Button, List, ListItem, ListItemText, IconButton } from '@mui/material';
@@ -34,6 +33,7 @@ const ClientVendorManagement: React.FC = () => {
 	};
 
 	const deleteVendor = async (id: number) => {
+		// eslint-disable-next-line no-restricted-globals
 		if (!confirm('Delete this vendor?')) return;
 		try {
 			await axios.delete(`/api/vendors/${id}`);
