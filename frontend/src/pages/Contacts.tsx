@@ -26,10 +26,10 @@ const Contacts: React.FC = () => {
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState({ contact_control: '', display_name: '', contact_type: '', contact_info: '' });
 
-  const fetch = async () => {
+  const fetchContacts = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/contacts`);
+  const res = await window.fetch(`${API_BASE_URL}/api/contacts`);
       const data = await res.json();
       setItems(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -37,7 +37,7 @@ const Contacts: React.FC = () => {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => { fetchContacts(); }, []);
 
   const handleOpen = (it?: Contact) => {
     if (it) {
@@ -56,12 +56,12 @@ const Contacts: React.FC = () => {
     try {
       let res;
       if (editId) {
-        res = await fetch(`${API_BASE}/api/contacts/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        res = await window.fetch(`${API_BASE_URL}/api/contacts/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       } else {
-        res = await fetch(`${API_BASE}/api/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        res = await window.fetch(`${API_BASE_URL}/api/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       }
-      if (!res.ok) throw new Error('Save failed');
-      await fetch();
+  if (!res.ok) throw new Error('Save failed');
+  await fetchContacts();
       handleClose();
     } catch (e) {
       alert('Save failed');
@@ -72,8 +72,8 @@ const Contacts: React.FC = () => {
     // eslint-disable-next-line no-restricted-globals
     if (!confirm('Delete this contact?')) return;
     try {
-      await fetch(`${API_BASE}/api/contacts/${id}`, { method: 'DELETE' });
-      await fetch();
+  await window.fetch(`${API_BASE_URL}/api/contacts/${id}`, { method: 'DELETE' });
+      await fetchContacts();
     } catch (e) {
       alert('Delete failed');
     }
