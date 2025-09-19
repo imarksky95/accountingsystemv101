@@ -6,7 +6,7 @@ export interface CrudOptions<T> {
   initialData?: T[];
 }
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || '';
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101.onrender.com';
 
 export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
   const [data, setData] = useState<T[]>(initialData);

@@ -3,7 +3,7 @@ import { useCrud } from '../hooks/useCrud';
 import axios from 'axios';
 import { Snackbar, Alert, CircularProgress } from '@mui/material';
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || '';
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101.onrender.com';
 
 export default function DisbursementReports() {
   const { data: reports, loading, error, fetchAll } = useCrud<any>({ endpoint: '/api/disbursement-reports' });
