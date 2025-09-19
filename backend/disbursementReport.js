@@ -14,7 +14,12 @@ router.get('/', async (req, res) => {
     const out = [];
     for (const r of reports) {
       const [vouchers] = await dbPool.execute(
-        'SELECT p.payment_voucher_id, p.payment_voucher_control, p.payee, p.amount_to_pay, p.preparation_date FROM disbursement_report_vouchers dv JOIN payment_vouchers p ON dv.payment_voucher_id = p.payment_voucher_id WHERE dv.disbursement_report_id = ?',
+        `SELECT p.payment_voucher_id, p.payment_voucher_control, p.amount_to_pay, p.preparation_date,
+          COALESCE(c.display_name, p.payee) AS payee
+         FROM disbursement_report_vouchers dv
+         JOIN payment_vouchers p ON dv.payment_voucher_id = p.payment_voucher_id
+         LEFT JOIN contacts c ON (p.payee = CAST(c.contact_id AS CHAR) OR p.payee = c.display_name)
+         WHERE dv.disbursement_report_id = ?`,
         [r.disbursement_report_id]
       );
       out.push({ ...r, vouchers });
@@ -34,8 +39,13 @@ router.get('/:id', async (req, res) => {
     if (!rows || rows.length === 0) return res.status(404).json({ error: 'Not found' });
     const report = rows[0];
     const [vouchers] = await dbPool.execute(
-      'SELECT p.payment_voucher_id, p.payment_voucher_control, p.payee, p.amount_to_pay, p.preparation_date FROM disbursement_report_vouchers dv JOIN payment_vouchers p ON dv.payment_voucher_id = p.payment_voucher_id WHERE dv.disbursement_report_id = ?',
-      [id]
+          `SELECT p.payment_voucher_id, p.payment_voucher_control, p.amount_to_pay, p.preparation_date,
+            COALESCE(c.display_name, p.payee) AS payee
+           FROM disbursement_report_vouchers dv
+           JOIN payment_vouchers p ON dv.payment_voucher_id = p.payment_voucher_id
+           LEFT JOIN contacts c ON (p.payee = CAST(c.contact_id AS CHAR) OR p.payee = c.display_name)
+           WHERE dv.disbursement_report_id = ?`,
+          [id]
     );
     res.json({ ...report, vouchers });
   } catch (err) {
