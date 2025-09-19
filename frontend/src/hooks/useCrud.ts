@@ -6,6 +6,8 @@ export interface CrudOptions<T> {
   initialData?: T[];
 }
 
+const API_BASE = process.env.REACT_APP_API_BASE_URL || '';
+
 export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
   const [data, setData] = useState<T[]>(initialData);
   const [loading, setLoading] = useState(false);
@@ -16,7 +18,8 @@ export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.get(endpoint);
+      const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+      const res = await axios.get(url);
       setData(res.data);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message);
@@ -30,7 +33,8 @@ export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
     setLoading(true);
     setError(null);
     try {
-      await axios.post(endpoint, item);
+      const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+      await axios.post(url, item);
       await fetchAll();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message);
@@ -44,7 +48,8 @@ export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
     setLoading(true);
     setError(null);
     try {
-      await axios.put(`${endpoint}/${id}`, item);
+      const base = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+      await axios.put(`${base}/${id}`, item);
       await fetchAll();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message);
@@ -58,7 +63,8 @@ export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
     setLoading(true);
     setError(null);
     try {
-      await axios.delete(`${endpoint}/${id}`);
+      const base = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+      await axios.delete(`${base}/${id}`);
       await fetchAll();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message);

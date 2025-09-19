@@ -3,6 +3,8 @@ import { useCrud } from '../hooks/useCrud';
 import axios from 'axios';
 import { Snackbar, Alert, CircularProgress } from '@mui/material';
 
+const API_BASE = process.env.REACT_APP_API_BASE_URL || '';
+
 export default function DisbursementReports() {
   const { data: reports, loading, error, fetchAll } = useCrud<any>({ endpoint: '/api/disbursement-reports' });
   const [expanded, setExpanded] = useState({} as Record<number, boolean>);
@@ -12,7 +14,7 @@ export default function DisbursementReports() {
 
   useEffect(() => {
     // fetch available payment vouchers
-    axios.get('/api/payment-vouchers').then(r => setPvList(r.data)).catch(() => {});
+    axios.get(`${API_BASE}/api/payment-vouchers`).then(r => setPvList(r.data)).catch(() => {});
   }, []);
 
   React.useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -34,7 +36,7 @@ export default function DisbursementReports() {
           <h3>Available Payment Vouchers</h3>
           <div>
             <button onClick={() => setSelected({})}>Clear</button>
-            <button onClick={() => axios.get('/api/payment-vouchers').then(r => setPvList(r.data)).catch(() => {})}>Refresh</button>
+            <button onClick={() => axios.get(`${API_BASE}/api/payment-vouchers`).then(r => setPvList(r.data)).catch(() => {})}>Refresh</button>
           </div>
           <ul>
             {pvList.map(pv => (
@@ -57,7 +59,7 @@ export default function DisbursementReports() {
               setCreating(true);
               try {
                 const token = localStorage.getItem('token');
-                await axios.post('/api/disbursement-reports', {
+                await axios.post(`${API_BASE}/api/disbursement-reports`, {
                   status: 'Draft',
                   disbursement_date: new Date().toISOString().slice(0,10),
                   purpose: 'Bulk created from UI',
