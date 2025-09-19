@@ -52,6 +52,9 @@ app.use('/api/scheduled-payments', scheduledPaymentRoutes);
 const disbursementReportRoutes = require('./disbursementReport');
 app.use('/api/disbursement-reports', disbursementReportRoutes);
 
+const vendorsRoutes = require('./vendors');
+app.use('/api/vendors', vendorsRoutes);
+
 // Role management (basic example)
 app.get('/api/roles', async (req, res, next) => {
   try {
