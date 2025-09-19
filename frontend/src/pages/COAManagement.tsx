@@ -300,6 +300,7 @@ const COAManagement: React.FC = () => {
         <DialogTitle>{editId ? 'Edit Account' : 'Add Account'}</DialogTitle>
         <DialogContent>
           <TextField
+            autoFocus
             margin="dense"
             label="Account Number"
             name="account_number"
