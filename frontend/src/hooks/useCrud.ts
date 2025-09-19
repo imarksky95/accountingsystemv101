@@ -8,6 +8,9 @@ export interface CrudOptions<T> {
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101.onrender.com';
 
+// Debug: print resolved API base so deployed bundle shows which host it's using
+console.log('useCrud: resolved API_BASE =', API_BASE);
+
 export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
   const [data, setData] = useState<T[]>(initialData);
   const [loading, setLoading] = useState(false);
