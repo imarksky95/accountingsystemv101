@@ -7,7 +7,7 @@ const mysql = require('mysql2/promise');
 
 const app = express();
 
-// CORS middleware - allow specific origins (reflecting true for allowed list)
+// CORS middleware - allow specific origins. Accept GitHub Pages origins by suffix
 const allowedOrigins = [
   process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
   'https://imarksky95.github.io',
@@ -17,14 +17,21 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function(origin, callback) {
-    // allow requests with no origin (like mobile apps, curl)
+    // allow requests with no origin (like curl, server-to-server)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      return callback(null, true);
-    } else {
-      console.warn('Blocked CORS request from origin:', origin);
-      return callback(new Error('Not allowed by CORS'));
+    // allow explicit whitelist
+    if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+    // allow any GitHub Pages origin (user pages) -- helpful for gh-pages hosting
+    try {
+      const url = new URL(origin);
+      if (url.hostname && url.hostname.endsWith('.github.io')) return callback(null, true);
+    } catch (e) {
+      // ignore
     }
+    // allow a broad override via env var for quick testing
+    if (process.env.ALLOW_ALL_ORIGINS === '1') return callback(null, true);
+    console.warn('Blocked CORS request from origin:', origin);
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   optionsSuccessStatus: 200
