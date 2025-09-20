@@ -78,7 +78,7 @@ const PaymentVouchers: React.FC = () => {
           const mapped = vendors.map(v => ({ contact_id: v.vendor_id, display_name: v.name, contact_type: 'Vendor' }));
           console.log('contacts empty; using vendors fallback count=', mapped.length, mapped.slice(0,5));
           setContacts(mapped);
-        } catch (e) {
+        } catch (e:any) {
           console.error('vendors fallback fetch error', e?.response?.data || e.message || e);
           setContacts([]);
         }
@@ -116,7 +116,7 @@ const PaymentVouchers: React.FC = () => {
           const mapped = vendors.map(v => ({ contact_id: v.vendor_id, display_name: v.name, contact_type: 'Vendor' }));
           setContacts(mapped);
           return mapped;
-        } catch (e) {
+        } catch (e:any) {
           console.error('vendors fallback fetch error', e?.response?.data || e.message || e);
           setContacts([]);
           return [];
