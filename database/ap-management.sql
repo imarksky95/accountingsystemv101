@@ -20,6 +20,31 @@ CREATE TABLE IF NOT EXISTS payment_vouchers (
   INDEX (coa_id)
 );
 
+-- Payment voucher related detail tables
+CREATE TABLE IF NOT EXISTS payment_voucher_payment_lines (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  payment_voucher_id INT NOT NULL,
+  payee_contact_id INT DEFAULT NULL,
+  payee_display VARCHAR(255) DEFAULT NULL,
+  description TEXT,
+  amount DECIMAL(15,2) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (payment_voucher_id),
+  INDEX (payee_contact_id)
+);
+
+CREATE TABLE IF NOT EXISTS payment_voucher_journal_lines (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  payment_voucher_id INT NOT NULL,
+  coa_id INT NOT NULL,
+  debit DECIMAL(15,2) DEFAULT 0,
+  credit DECIMAL(15,2) DEFAULT 0,
+  remarks VARCHAR(512) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (payment_voucher_id),
+  INDEX (coa_id)
+);
+
 CREATE TABLE IF NOT EXISTS check_vouchers (
   check_voucher_id INT AUTO_INCREMENT PRIMARY KEY,
   check_voucher_control VARCHAR(64) NOT NULL UNIQUE,
