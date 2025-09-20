@@ -54,7 +54,21 @@ const PaymentVouchers: React.FC = () => {
         axios.get(`${API_BASE}/api/coa/all/simple`),
       ]);
       setItems(Array.isArray(pvRes.data) ? pvRes.data : []);
-      setContacts(Array.isArray(contactRes.data) ? contactRes.data : []);
+      const fetchedContacts = Array.isArray(contactRes.data) ? contactRes.data : [];
+      // if no contacts returned, try vendors as fallback
+      if (fetchedContacts.length === 0) {
+        try {
+          const vendRes = await axios.get(`${API_BASE}/api/vendors`);
+          const vendors = Array.isArray(vendRes.data) ? vendRes.data : [];
+          // Map vendors to contact-like shape
+          const mapped = vendors.map(v => ({ contact_id: v.vendor_id, display_name: v.name }));
+          setContacts(mapped);
+        } catch (e) {
+          setContacts([]);
+        }
+      } else {
+        setContacts(fetchedContacts);
+      }
       setCoas(Array.isArray(coaRes.data) ? coaRes.data : []);
     } catch (e:any) {
       console.error('fetchAll error', e);
@@ -194,10 +208,18 @@ const PaymentVouchers: React.FC = () => {
                   <TableRow key={idx}>
                     <TableCell sx={{minWidth:200}}>
                       <Select fullWidth value={line.payee_id || line.payee || ''} onChange={e => {
-                        const v = e.target.value; const copy = {...form}; copy.payment_lines[idx].payee_id = v; copy.payment_lines[idx].payee_name = contacts.find(c=>String(c.contact_id)===String(v))?.display_name || '' ; setForm(copy);
+                        const v = e.target.value; const copy = {...form}; copy.payment_lines[idx].payee_id = v; copy.payment_lines[idx].payee_name = contacts.find(c=>String(c.contact_id)===String(v))?.display_name || '' ;
+                        // set top-level payee to selected contact so listing shows friendly name
+                        copy.payee = v ? String(v) : copy.payee;
+                        setForm(copy);
                       }}>
                         <MenuItem value="">-- Select Payee --</MenuItem>
-                        {contacts.map(c => <MenuItem key={c.contact_id} value={String(c.contact_id)}>{c.display_name}</MenuItem>)}
+                        {contacts.map(c => (
+                          <MenuItem key={c.contact_id} value={String(c.contact_id)}>
+                            {c.display_name}
+                            {c.contact_type ? ` (${c.contact_type})` : ''}
+                          </MenuItem>
+                        ))}
                       </Select>
                     </TableCell>
                     <TableCell>
@@ -214,7 +236,14 @@ const PaymentVouchers: React.FC = () => {
               </TableBody>
             </Table>
             <Box sx={{mt:1}}>
-              <Button onClick={() => { const copy = {...form}; copy.payment_lines = copy.payment_lines || []; copy.payment_lines.push({payee_id:'', description:'', amount:0}); setForm(copy); }}>+ Add another line</Button>
+              <Button onClick={() => {
+                const copy = {...form};
+                copy.payment_lines = copy.payment_lines || [];
+                copy.payment_lines.push({payee_id:'', description:'', amount:0});
+                // if no top-level payee yet, set it to this line's payee (empty until user selects)
+                if (!copy.payee && copy.payment_lines.length === 1) copy.payee = '';
+                setForm(copy);
+              }}>+ Add another line</Button>
             </Box>
             <Box sx={{mt:2, textAlign:'right', fontWeight:700}}>Total Amount to Pay: PHP {(form.payment_lines || []).reduce((s:any,l:any)=>s + (Number(l.amount)||0), 0)}</Box>
           </Box>
@@ -289,15 +318,26 @@ const PaymentVouchers: React.FC = () => {
             const totalCredit = (form.journal_lines || []).reduce((s:any,l:any)=>s + (Number(l.credit)||0), 0);
             if (totalDebit !== totalCredit) { setSnackMsg('Total Debit and Total Credit must be equal'); setSnackSeverity('error'); setSnackOpen(true); return; }
             // Prepare payload mapping lines to expected backend fields (flatten payment_lines into a simplified array)
+            // Map payment lines to backend field names: payee_contact_id and payee_display
+            const mappedPaymentLines = (form.payment_lines || []).map((l:any) => {
+              const contactId = l.payee_id || l.payee_contact_id || '';
+              const display = l.payee_name || l.payee_display || (contacts.find((c:any) => String(c.contact_id) === String(contactId))?.display_name) || '';
+              return { payee_contact_id: contactId ? Number(contactId) : null, payee_display: display, description: l.description, amount: Number(l.amount) };
+            });
+
+            // Set top-level payee so backend can JOIN and produce payee_name in list view. Use first payment line if present.
+            const topPayee = mappedPaymentLines.length > 0 && mappedPaymentLines[0].payee_contact_id ? String(mappedPaymentLines[0].payee_contact_id) : (form.payee || '');
+
             const payload = {
               status: form.status || 'Draft',
               preparation_date: form.preparation_date,
               purpose: form.purpose,
               paid_through: form.paid_through || 'Bank',
               prepared_by: user?.user_id || null,
+              payee: topPayee,
               amount_to_pay: (form.payment_lines || []).reduce((s:any,l:any)=>s + (Number(l.amount)||0), 0),
               description: form.description || '',
-              payment_lines: (form.payment_lines || []).map((l:any) => ({ payee: String(l.payee_id || l.payee || ''), description: l.description, amount: Number(l.amount) })),
+              payment_lines: mappedPaymentLines,
               journal_lines: (form.journal_lines || []).map((l:any) => ({ coa_id: l.coa_id || null, debit: Number(l.debit)||0, credit: Number(l.credit)||0, remarks: l.remarks || '' })),
               reviewed_by: form.reviewed_by,
               approved_by: form.approved_by
