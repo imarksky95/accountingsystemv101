@@ -17,8 +17,8 @@ router.get('/', async (req, res) => {
         COALESCE(c.display_name, p.payee) AS payee,
         u.user_id AS prepared_by_id,
         u.username AS prepared_by_username,
-        coa.coa_id AS coa_id,
-        coa.account_name AS coa_name
+  coa.coa_id AS coa_id,
+  COALESCE(coa.account_name, coa.name) AS coa_name
       FROM payment_vouchers p
       LEFT JOIN contacts c ON (p.payee = CAST(c.contact_id AS CHAR) OR p.payee = c.display_name)
       LEFT JOIN users u ON p.prepared_by = u.user_id
