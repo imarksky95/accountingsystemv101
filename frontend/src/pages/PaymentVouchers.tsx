@@ -102,36 +102,6 @@ const PaymentVouchers: React.FC = () => {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); }, []);
-
-  // Dedicated fetchers so we can ensure data before opening dialog
-  const fetchContacts = async () => {
-    try {
-      const contactRes = await axios.get(`${API_BASE}/api/contacts`);
-      const fetchedContacts = Array.isArray(contactRes.data) ? contactRes.data : [];
-      if (fetchedContacts.length === 0) {
-        try {
-          const vendRes = await axios.get(`${API_BASE}/api/vendors`);
-          const vendors = Array.isArray(vendRes.data) ? vendRes.data : [];
-          const mapped = vendors.map(v => ({ contact_id: v.vendor_id, display_name: v.name, contact_type: 'Vendor' }));
-          setContacts(mapped);
-          return mapped;
-        } catch (e:any) {
-          console.error('vendors fallback fetch error', e?.response?.data || e.message || e);
-          setContacts([]);
-          return [];
-        }
-      } else {
-        setContacts(fetchedContacts);
-        return fetchedContacts;
-      }
-    } catch (err:any) {
-      console.error('contacts fetch error', err?.response?.data || err.message || err);
-      setContacts([]);
-      return [];
-    }
-  };
-
   const fetchCoas = async () => {
     try {
       const coaRes = await axios.get(`${API_BASE}/api/coa/all/simple`);
@@ -145,8 +115,56 @@ const PaymentVouchers: React.FC = () => {
     }
   };
 
-  const openNew = async () => { await Promise.all([fetchContacts(), fetchCoas()]); setEditing(null); setForm({ ...emptyForm, preparation_date: new Date().toISOString().slice(0,10), prepared_by: user?.user_id || null }); setOpen(true); };
-  const openEdit = async (pv: any) => { await Promise.all([fetchContacts(), fetchCoas()]); setEditing(pv); setForm({ ...pv }); setOpen(true); };
+  const fetchContacts = async () => {
+    try {
+      const contactRes = await axios.get(`${API_BASE}/api/contacts`);
+      const fetchedContacts = Array.isArray(contactRes.data) ? contactRes.data : [];
+      if (!fetchedContacts || fetchedContacts.length === 0) {
+        // fallback to vendors
+        try {
+          const vendRes = await axios.get(`${API_BASE}/api/vendors`);
+          const vendors = Array.isArray(vendRes.data) ? vendRes.data : [];
+          const mapped = vendors.map((v:any) => ({ contact_id: v.vendor_id, display_name: v.name, contact_type: 'Vendor' }));
+          setContacts(mapped);
+          return mapped;
+        } catch (e:any) {
+          console.error('vendors fallback fetch error', e?.response?.data || e.message || e);
+          setContacts([]);
+          return [];
+        }
+      }
+      setContacts(fetchedContacts);
+      return fetchedContacts;
+    } catch (err:any) {
+      console.error('contacts fetch error', err?.response?.data || err.message || err);
+      setContacts([]);
+      return [];
+    }
+  };
+
+  const openNew = async () => {
+    await Promise.all([fetchContacts(), fetchCoas()]);
+    setEditing(null);
+    setForm({
+      ...emptyForm,
+      preparation_date: new Date().toISOString().slice(0,10),
+      prepared_by: user?.user_id || null,
+      // ensure at least one payment_line and one journal_line so selects render options
+      payment_lines: [{ payee_id: '', description: '', amount: 0 }],
+      journal_lines: [{ coa_id: '', debit: 0, credit: 0, remarks: '' }]
+    });
+    setOpen(true);
+  };
+  const openEdit = async (pv: any) => {
+    await Promise.all([fetchContacts(), fetchCoas()]);
+    setEditing(pv);
+    setForm({
+      ...pv,
+      payment_lines: pv.payment_lines && pv.payment_lines.length ? pv.payment_lines : [{ payee_id: '', description: '', amount: 0 }],
+      journal_lines: pv.journal_lines && pv.journal_lines.length ? pv.journal_lines : [{ coa_id: '', debit: 0, credit: 0, remarks: '' }]
+    });
+    setOpen(true);
+  };
 
   
 
@@ -333,9 +351,9 @@ const PaymentVouchers: React.FC = () => {
                 {(form.journal_lines || []).map((line:any, idx:number) => (
                   <TableRow key={idx}>
                     <TableCell sx={{minWidth:200}}>
-                      <Select fullWidth value={line.coa_id || ''} onChange={e => { const copy = {...form}; copy.journal_lines[idx].coa_id = e.target.value; setForm(copy); }}>
+                      <Select fullWidth value={String(line.coa_id || '')} onChange={e => { const copy = {...form}; copy.journal_lines[idx].coa_id = e.target.value; setForm(copy); }}>
                         <MenuItem value="">-- Select COA --</MenuItem>
-                        {coas.map((a:any) => <MenuItem key={a.coa_id} value={a.coa_id}>{a.account_name || a.name || a.coa_id}</MenuItem>)}
+                        {coas.map((a:any) => <MenuItem key={a.coa_id} value={String(a.coa_id)}>{a.account_name || a.name || a.coa_id}</MenuItem>)}
                       </Select>
                     </TableCell>
                     <TableCell>
