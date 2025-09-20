@@ -76,19 +76,23 @@ const PaymentVouchers: React.FC = () => {
           const vendors = Array.isArray(vendRes.data) ? vendRes.data : [];
           // Map vendors to contact-like shape
           const mapped = vendors.map(v => ({ contact_id: v.vendor_id, display_name: v.name, contact_type: 'Vendor' }));
+          console.log('contacts empty; using vendors fallback count=', mapped.length, mapped.slice(0,5));
           setContacts(mapped);
         } catch (e) {
           console.error('vendors fallback fetch error', e?.response?.data || e.message || e);
           setContacts([]);
         }
       } else {
+        console.log('contacts fetched count=', fetchedContacts.length, fetchedContacts.slice(0,5));
         setContacts(fetchedContacts);
       }
 
       // COA
       try {
         const coaRes = await axios.get(`${API_BASE}/api/coa/all/simple`);
-        setCoas(Array.isArray(coaRes.data) ? coaRes.data : []);
+        const c = Array.isArray(coaRes.data) ? coaRes.data : [];
+        console.log('coas fetched count=', c.length, c.slice(0,5));
+        setCoas(c);
       } catch (err:any) {
         console.error('coa fetch error', err?.response?.data || err.message || err);
         setCoas([]);
@@ -100,8 +104,49 @@ const PaymentVouchers: React.FC = () => {
 
   useEffect(() => { fetchAll(); }, []);
 
-  const openNew = () => { setEditing(null); setForm({ ...emptyForm, preparation_date: new Date().toISOString().slice(0,10), prepared_by: user?.user_id || null }); setOpen(true); };
-  const openEdit = (pv: any) => { setEditing(pv); setForm({ ...pv }); setOpen(true); };
+  // Dedicated fetchers so we can ensure data before opening dialog
+  const fetchContacts = async () => {
+    try {
+      const contactRes = await axios.get(`${API_BASE}/api/contacts`);
+      const fetchedContacts = Array.isArray(contactRes.data) ? contactRes.data : [];
+      if (fetchedContacts.length === 0) {
+        try {
+          const vendRes = await axios.get(`${API_BASE}/api/vendors`);
+          const vendors = Array.isArray(vendRes.data) ? vendRes.data : [];
+          const mapped = vendors.map(v => ({ contact_id: v.vendor_id, display_name: v.name, contact_type: 'Vendor' }));
+          setContacts(mapped);
+          return mapped;
+        } catch (e) {
+          console.error('vendors fallback fetch error', e?.response?.data || e.message || e);
+          setContacts([]);
+          return [];
+        }
+      } else {
+        setContacts(fetchedContacts);
+        return fetchedContacts;
+      }
+    } catch (err:any) {
+      console.error('contacts fetch error', err?.response?.data || err.message || err);
+      setContacts([]);
+      return [];
+    }
+  };
+
+  const fetchCoas = async () => {
+    try {
+      const coaRes = await axios.get(`${API_BASE}/api/coa/all/simple`);
+      const c = Array.isArray(coaRes.data) ? coaRes.data : [];
+      setCoas(c);
+      return c;
+    } catch (err:any) {
+      console.error('coa fetch error', err?.response?.data || err.message || err);
+      setCoas([]);
+      return [];
+    }
+  };
+
+  const openNew = async () => { await Promise.all([fetchContacts(), fetchCoas()]); setEditing(null); setForm({ ...emptyForm, preparation_date: new Date().toISOString().slice(0,10), prepared_by: user?.user_id || null }); setOpen(true); };
+  const openEdit = async (pv: any) => { await Promise.all([fetchContacts(), fetchCoas()]); setEditing(pv); setForm({ ...pv }); setOpen(true); };
 
   
 
