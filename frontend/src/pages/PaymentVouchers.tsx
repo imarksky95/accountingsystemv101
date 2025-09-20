@@ -48,28 +48,51 @@ const PaymentVouchers: React.FC = () => {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [pvRes, contactRes, coaRes] = await Promise.all([
-        axios.get(`${API_BASE}/api/payment-vouchers`),
-        axios.get(`${API_BASE}/api/contacts`),
-        axios.get(`${API_BASE}/api/coa/all/simple`),
-      ]);
-      setItems(Array.isArray(pvRes.data) ? pvRes.data : []);
-      const fetchedContacts = Array.isArray(contactRes.data) ? contactRes.data : [];
+      // Fetch payment vouchers, contacts, and coas independently so one failure doesn't block the others
+      let pvResData: any[] = [];
+      try {
+        const pvRes = await axios.get(`${API_BASE}/api/payment-vouchers`);
+        pvResData = Array.isArray(pvRes.data) ? pvRes.data : [];
+      } catch (err:any) {
+        console.error('payment-vouchers fetch error', err?.response?.data || err.message || err);
+        // keep pvResData as empty array
+      }
+      setItems(pvResData);
+
+      // Contacts
+      let fetchedContacts: any[] = [];
+      try {
+        const contactRes = await axios.get(`${API_BASE}/api/contacts`);
+        fetchedContacts = Array.isArray(contactRes.data) ? contactRes.data : [];
+      } catch (err:any) {
+        console.error('contacts fetch error', err?.response?.data || err.message || err);
+        fetchedContacts = [];
+      }
+
       // if no contacts returned, try vendors as fallback
       if (fetchedContacts.length === 0) {
         try {
           const vendRes = await axios.get(`${API_BASE}/api/vendors`);
           const vendors = Array.isArray(vendRes.data) ? vendRes.data : [];
           // Map vendors to contact-like shape
-          const mapped = vendors.map(v => ({ contact_id: v.vendor_id, display_name: v.name }));
+          const mapped = vendors.map(v => ({ contact_id: v.vendor_id, display_name: v.name, contact_type: 'Vendor' }));
           setContacts(mapped);
         } catch (e) {
+          console.error('vendors fallback fetch error', e?.response?.data || e.message || e);
           setContacts([]);
         }
       } else {
         setContacts(fetchedContacts);
       }
-      setCoas(Array.isArray(coaRes.data) ? coaRes.data : []);
+
+      // COA
+      try {
+        const coaRes = await axios.get(`${API_BASE}/api/coa/all/simple`);
+        setCoas(Array.isArray(coaRes.data) ? coaRes.data : []);
+      } catch (err:any) {
+        console.error('coa fetch error', err?.response?.data || err.message || err);
+        setCoas([]);
+      }
     } catch (e:any) {
       console.error('fetchAll error', e);
     } finally { setLoading(false); }
