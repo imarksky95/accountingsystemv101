@@ -6,7 +6,7 @@ export interface CrudOptions<T> {
   initialData?: T[];
 }
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101.onrender.com';
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
 
 // Debug: print resolved API base so deployed bundle shows which host it's using
 console.log('useCrud: resolved API_BASE =', API_BASE);
