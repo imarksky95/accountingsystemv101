@@ -1,0 +1,23 @@
+# Render service manifest for the backend (Docker)
+# Edit envVars values in the Render dashboard (do NOT commit secrets).
+services:
+  - type: web
+    name: accountingsystemv101-backend
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    buildContext: .
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /api/test
+    plan: free
+    envVars:
+      - key: DB_HOST
+        value: ""
+      - key: DB_USER
+        value: ""
+      - key: DB_PASS
+        value: ""
+      - key: DB_NAME
+        value: ""
+      - key: JWT_SECRET
+        value: ""
