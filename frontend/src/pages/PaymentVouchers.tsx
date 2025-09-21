@@ -112,19 +112,24 @@ const PaymentVouchers: React.FC = () => {
 
   const fetchCoas = async () => {
     try {
-      const coaRes = await axios.get(`${API_BASE}/api/coa/all/simple`);
-      const c = Array.isArray(coaRes.data) ? coaRes.data : [];
+      // Use the same simple fetch style as `Contacts.tsx` for consistent behavior
+      const res = await window.fetch(`${API_BASE}/api/coa/all/simple`);
+      if (!res.ok) throw new Error(`COA primary fetch failed: ${res.status}`);
+      const data = await res.json();
+      const c = Array.isArray(data) ? data : [];
       setCoas(c);
       return c;
     } catch (err:any) {
-      console.warn('coa fetch primary failed, trying fallback', err?.response?.data || err.message || err);
+      console.warn('coa fetch primary failed, trying fallback', err?.message || err);
       try {
-        const fb = await axios.get(`${API_BASE}/api/coa/all/simple/fallback`);
-        const c2 = Array.isArray(fb.data) ? fb.data : [];
+        const fbRes = await window.fetch(`${API_BASE}/api/coa/all/simple/fallback`);
+        if (!fbRes.ok) throw new Error(`COA fallback fetch failed: ${fbRes.status}`);
+        const data2 = await fbRes.json();
+        const c2 = Array.isArray(data2) ? data2 : [];
         setCoas(c2);
         return c2;
       } catch (err2:any) {
-        console.error('coa fetch fallback failed', err2?.response?.data || err2.message || err2);
+        console.error('coa fetch fallback failed', err2?.message || err2);
         setCoas([]);
         return [];
       }
@@ -181,6 +186,11 @@ const PaymentVouchers: React.FC = () => {
     });
     setOpen(true);
   };
+
+  // Prefetch COAs on mount for the dialog selects
+  React.useEffect(() => {
+    fetchCoas();
+  }, []);
 
   
 
