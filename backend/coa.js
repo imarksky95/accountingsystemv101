@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
   try {
     const dbPool = getDbPool(req);
     const [rows] = await dbPool.execute(`
-      SELECT coa.*, COALESCE(parent.account_name, parent.name) AS parent_account_name
+      SELECT coa.*, parent.account_name AS parent_account_name
       FROM chart_of_accounts coa
       LEFT JOIN chart_of_accounts parent ON coa.parent_id = parent.coa_id
       WHERE coa.deleted = 0
@@ -88,7 +88,8 @@ router.put('/:id', async (req, res) => {
 router.get('/all/simple', async (req, res) => {
   try {
     const dbPool = getDbPool(req);
-    const [rows] = await dbPool.execute('SELECT coa_id, COALESCE(account_name, name) AS account_name FROM chart_of_accounts WHERE deleted = 0');
+  // Primary simple list: assume modern schema with `account_name` column.
+  const [rows] = await dbPool.execute('SELECT coa_id, account_name AS account_name FROM chart_of_accounts WHERE deleted = 0');
     res.json(rows);
   } catch (err) {
     console.error('COA API error (GET /all/simple):', err);
