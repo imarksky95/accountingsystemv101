@@ -94,8 +94,16 @@ const PaymentVouchers: React.FC = () => {
         console.log('coas fetched count=', c.length, c.slice(0,5));
         setCoas(c);
       } catch (err:any) {
-        console.error('coa fetch error', err?.response?.data || err.message || err);
-        setCoas([]);
+        console.warn('coa fetch primary failed, trying fallback', err?.response?.data || err.message || err);
+        try {
+          const fb = await axios.get(`${API_BASE}/api/coa/all/simple/fallback`);
+          const c2 = Array.isArray(fb.data) ? fb.data : [];
+          console.log('coa fetched fallback count=', c2.length, c2.slice(0,5));
+          setCoas(c2);
+        } catch (err2:any) {
+          console.error('coa fetch fallback failed', err2?.response?.data || err2.message || err2);
+          setCoas([]);
+        }
       }
     } catch (e:any) {
       console.error('fetchAll error', e);
@@ -109,9 +117,17 @@ const PaymentVouchers: React.FC = () => {
       setCoas(c);
       return c;
     } catch (err:any) {
-      console.error('coa fetch error', err?.response?.data || err.message || err);
-      setCoas([]);
-      return [];
+      console.warn('coa fetch primary failed, trying fallback', err?.response?.data || err.message || err);
+      try {
+        const fb = await axios.get(`${API_BASE}/api/coa/all/simple/fallback`);
+        const c2 = Array.isArray(fb.data) ? fb.data : [];
+        setCoas(c2);
+        return c2;
+      } catch (err2:any) {
+        console.error('coa fetch fallback failed', err2?.response?.data || err2.message || err2);
+        setCoas([]);
+        return [];
+      }
     }
   };
 
