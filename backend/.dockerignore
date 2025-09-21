@@ -1,0 +1,8 @@
+node_modules
+.git
+*.log
+frontend/
+build/
+uploads/
+npm-debug.log
+.env
