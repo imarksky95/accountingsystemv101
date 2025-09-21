@@ -187,9 +187,9 @@ const PaymentVouchers: React.FC = () => {
     setOpen(true);
   };
 
-  // Prefetch COAs on mount for the dialog selects
+  // Prefetch data on mount for the overview and dialog selects
   React.useEffect(() => {
-    fetchCoas();
+    fetchAll();
   }, []);
 
   
@@ -251,10 +251,8 @@ const PaymentVouchers: React.FC = () => {
               <TableCell></TableCell>
               <TableCell>PV Ctrl</TableCell>
               <TableCell>Prepared</TableCell>
-              <TableCell>Payee</TableCell>
-              <TableCell>COA</TableCell>
+              <TableCell>Purpose</TableCell>
               <TableCell>Amount</TableCell>
-              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -263,17 +261,12 @@ const PaymentVouchers: React.FC = () => {
                 <TableCell><Checkbox checked={!!selected[pv.payment_voucher_id]} onChange={() => toggleSelect(pv.payment_voucher_id)} /></TableCell>
                 <TableCell>{pv.payment_voucher_control}</TableCell>
                 <TableCell>{pv.preparation_date} by {pv.prepared_by_username || pv.prepared_by}</TableCell>
-                <TableCell>{pv.payee_name || pv.payee}</TableCell>
-                <TableCell>{pv.coa_name || pv.coa_id}</TableCell>
+                <TableCell>{pv.purpose || '-'}</TableCell>
                 <TableCell>{pv.amount_to_pay}</TableCell>
-                <TableCell>
-                  <Button size="small" onClick={() => openEdit(pv)}>Edit</Button>
-                  <Button size="small" color="error" onClick={() => confirmDelete(pv.payment_voucher_id)}>Delete</Button>
-                </TableCell>
               </TableRow>
             ))}
             {items.length === 0 && (
-              <TableRow><TableCell colSpan={7}>No payment vouchers found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5}>No payment vouchers found.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
