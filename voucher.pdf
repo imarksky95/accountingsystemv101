@@ -1,1 +1,1 @@
-{"error":"Puppeteer is not available on this server. Install puppeteer and redeploy to enable PDF generation."}
+{"error":"connect ETIMEDOUT"}

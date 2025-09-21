@@ -1,0 +1,15 @@
+HTTP/2 501 
+date: Sun, 21 Sep 2025 17:10:22 GMT
+content-type: application/json; charset=utf-8
+access-control-allow-credentials: true
+etag: W/"6f-g4VLiRbayxy6ej8pUprBA/lcLsI"
+rndr-id: c385f63e-b3cf-495d
+vary: Origin
+vary: Accept-Encoding
+x-powered-by: Express
+x-render-origin-server: Render
+cf-cache-status: DYNAMIC
+server: cloudflare
+cf-ray: 982b2ce6dda38820-SIN
+alt-svc: h3=":443"; ma=86400
+
