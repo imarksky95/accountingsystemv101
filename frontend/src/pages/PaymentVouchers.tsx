@@ -465,9 +465,14 @@ const PaymentVouchers: React.FC = () => {
             };
             try {
               const token = localStorage.getItem('token');
-              if (editing) await axios.put(`${API_BASE}/api/payment-vouchers/${editing.payment_voucher_id}`, payload, { headers: { Authorization: `Bearer ${token}` } });
-              else await axios.post(`${API_BASE}/api/payment-vouchers`, payload, { headers: { Authorization: `Bearer ${token}` } });
-              setSnackMsg(editing ? 'Payment Voucher updated' : 'Payment Voucher created'); setSnackSeverity('success'); setSnackOpen(true); setOpen(false); fetchAll();
+              if (editing) {
+                await axios.put(`${API_BASE}/api/payment-vouchers/${editing.payment_voucher_id}`, payload, { headers: { Authorization: `Bearer ${token}` } });
+                setSnackMsg('Payment Voucher updated'); setSnackSeverity('success'); setSnackOpen(true); setOpen(false); fetchAll();
+              } else {
+                const res = await axios.post(`${API_BASE}/api/payment-vouchers`, payload, { headers: { Authorization: `Bearer ${token}` } });
+                const ctrl = res.data && res.data.payment_voucher_control ? res.data.payment_voucher_control : null;
+                setSnackMsg(ctrl ? `Payment Voucher created (${ctrl})` : 'Payment Voucher created'); setSnackSeverity('success'); setSnackOpen(true); setOpen(false); fetchAll();
+              }
             } catch (err:any) { setSnackMsg(err.response?.data?.error || err.message || 'Save failed'); setSnackSeverity('error'); setSnackOpen(true); }
           }} variant="contained">Save</Button>
         </DialogActions>
