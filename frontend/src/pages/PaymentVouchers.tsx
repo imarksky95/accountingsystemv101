@@ -33,6 +33,9 @@ const PaymentVouchers: React.FC = () => {
   const [form, setForm] = useState<any>(emptyForm);
   const [expectedControl, setExpectedControl] = useState<string>('');
   const firstFocusRef = useRef<HTMLInputElement | null>(null);
+  const [companyProfile, setCompanyProfile] = useState<any>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<any | null>(null);
 
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -213,6 +216,11 @@ const PaymentVouchers: React.FC = () => {
     }
   }, [open]);
 
+  React.useEffect(() => {
+    // fetch company profile for header
+    axios.get(`${API_BASE}/api/company-profile`).then(r => setCompanyProfile(r.data)).catch(() => setCompanyProfile(null));
+  }, []);
+
   
 
   const confirmDelete = (id: number) => { setDeleteId(id); setConfirmOpen(true); };
@@ -287,7 +295,8 @@ const PaymentVouchers: React.FC = () => {
                 <TableCell>{pv.amount_to_pay}</TableCell>
                 <TableCell>
                   <Button size="small" onClick={() => openEdit(pv)} sx={{mr:1}}>Edit</Button>
-                  <Button size="small" color="error" onClick={() => confirmDelete(pv.payment_voucher_id)}>Delete</Button>
+                  <Button size="small" color="error" onClick={() => confirmDelete(pv.payment_voucher_id)} sx={{mr:1}}>Delete</Button>
+                  <Button size="small" onClick={() => { setPreviewItem(pv); setPreviewOpen(true); }}>Preview</Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -485,6 +494,80 @@ const PaymentVouchers: React.FC = () => {
               }
             } catch (err:any) { setSnackMsg(err.response?.data?.error || err.message || 'Save failed'); setSnackSeverity('error'); setSnackOpen(true); }
           }} variant="contained">Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Preview / Print dialog */}
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Preview Payment Voucher</DialogTitle>
+        <DialogContent>
+          {previewItem ? (
+            <div id="pv-print-area" style={{padding:20, fontFamily: 'Arial, sans-serif', color: '#000'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20}}>
+                <div>
+                  <div style={{fontSize:20, fontWeight:700}}>{companyProfile?.name || 'Company Name'}</div>
+                  <div style={{fontSize:12}}>{companyProfile?.address || ''}</div>
+                </div>
+                <div>
+                  {companyProfile?.logo ? <img src={companyProfile.logo} alt="logo" style={{height:60}} /> : null}
+                </div>
+              </div>
+              <hr />
+              <div style={{display:'flex', justifyContent:'space-between', marginTop:10}}>
+                <div>
+                  <div><strong>PV Ctrl:</strong> {previewItem.payment_voucher_control}</div>
+                  <div><strong>Prepared:</strong> {previewItem.preparation_date}</div>
+                  <div><strong>Purpose:</strong> {previewItem.purpose}</div>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div><strong>Amount:</strong> PHP {previewItem.amount_to_pay}</div>
+                </div>
+              </div>
+              <div style={{marginTop:20}}>
+                <div style={{fontWeight:700}}>Payment Details</div>
+                <table style={{width:'100%', borderCollapse:'collapse', marginTop:8}}>
+                  <thead>
+                    <tr><th style={{borderBottom:'1px solid #ccc', textAlign:'left'}}>Payee</th><th style={{borderBottom:'1px solid #ccc', textAlign:'left'}}>Description</th><th style={{borderBottom:'1px solid #ccc', textAlign:'right'}}>Amount</th></tr>
+                  </thead>
+                  <tbody>
+                    {(previewItem.payment_lines || []).map((l:any, i:number) => (
+                      <tr key={i}><td style={{padding:'6px 0'}}>{l.payee_display || l.payee_name || l.payee_contact_id || '-'}</td><td style={{padding:'6px 0'}}>{l.description || ''}</td><td style={{padding:'6px 0', textAlign:'right'}}>{Number(l.amount).toFixed(2)}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{marginTop:20}}>
+                <div style={{fontWeight:700}}>Journal Entries</div>
+                <table style={{width:'100%', borderCollapse:'collapse', marginTop:8}}>
+                  <thead>
+                    <tr><th style={{borderBottom:'1px solid #ccc', textAlign:'left'}}>COA</th><th style={{borderBottom:'1px solid #ccc', textAlign:'right'}}>Debit</th><th style={{borderBottom:'1px solid #ccc', textAlign:'right'}}>Credit</th></tr>
+                  </thead>
+                  <tbody>
+                    {(previewItem.journal_lines || []).map((j:any, i:number) => (
+                      <tr key={i}><td style={{padding:'6px 0'}}>{j.coa_id || j.account_name || j.coa_name || ''}</td><td style={{padding:'6px 0', textAlign:'right'}}>{Number(j.debit||0).toFixed(2)}</td><td style={{padding:'6px 0', textAlign:'right'}}>{Number(j.credit||0).toFixed(2)}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : <div>No preview data</div>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreviewOpen(false)}>Close</Button>
+          <Button onClick={() => {
+            // open printable window
+            const el = document.getElementById('pv-print-area');
+            if (!el) return;
+            const win = window.open('', '_blank', 'noopener');
+            if (!win) return;
+            win.document.write('<html><head><title>Payment Voucher</title>');
+            win.document.write('<style>body{font-family: Arial, sans-serif; color:#000; padding:20px;} table{width:100%;border-collapse:collapse;} th,td{padding:6px 4px;} th{border-bottom:1px solid #ccc;}</style>');
+            win.document.write('</head><body>');
+            win.document.write(el.innerHTML);
+            win.document.write('</body></html>');
+            win.document.close();
+            setTimeout(() => { win.print(); }, 300);
+          }} variant="contained">Print / Save as PDF</Button>
         </DialogActions>
       </Dialog>
 
