@@ -3,38 +3,61 @@ const router = express.Router();
 
 function getDbPool(req) { return req.app.get('dbPool'); }
 
-// Full-featured list SQL: join contacts, users, and COA. Use COALESCE(account_name, name) for schema compatibility.
-const PV_LIST_SQL = [
-  'SELECT p.*',
-  ' , c.contact_id AS payee_id',
-  ' , c.display_name AS payee_name',
-  ' , COALESCE(c.display_name, p.payee) AS payee',
-  ' , u.user_id AS prepared_by_id',
-  ' , u.username AS prepared_by_username',
-  ' , COALESCE(coa.account_name, coa.name) AS coa_name',
-  ' , coa.coa_id AS coa_id',
-  ' FROM payment_vouchers p',
-  ' LEFT JOIN contacts c ON (p.payee = CAST(c.contact_id AS CHAR) OR p.payee = c.display_name)',
-  ' LEFT JOIN users u ON p.prepared_by = u.user_id',
-  ' LEFT JOIN chart_of_accounts coa ON p.coa_id = coa.coa_id',
-  ' ORDER BY p.payment_voucher_id DESC'
-].join(' ');
+// Use a defensive list: fetch raw payment_vouchers then attach related display names
+// separately. This avoids runtime SQL errors on deployments with differing schemas.
 
 // GET: list payment vouchers with payment_lines and journal_lines attached per PV
 router.get('/', async (req, res) => {
   const db = getDbPool(req);
   try {
-    const [rows] = await db.execute(PV_LIST_SQL);
+    const [rows] = await db.execute('SELECT * FROM payment_vouchers ORDER BY payment_voucher_id DESC');
     const out = [];
     for (const pv of rows) {
+      // Attach payment and journal lines (best-effort)
+      let payment_lines = [];
+      let journal_lines = [];
       try {
-        const [payment_lines] = await db.execute('SELECT * FROM payment_voucher_payment_lines WHERE payment_voucher_id=? ORDER BY id', [pv.payment_voucher_id]);
-        const [journal_lines] = await db.execute('SELECT * FROM payment_voucher_journal_lines WHERE payment_voucher_id=? ORDER BY id', [pv.payment_voucher_id]);
-        out.push(Object.assign({}, pv, { payment_lines, journal_lines }));
-      } catch (innerErr) {
-        console.error('Error fetching lines for PV', pv.payment_voucher_id, innerErr && innerErr.stack ? innerErr.stack : innerErr);
-        out.push(Object.assign({}, pv, { payment_lines: [], journal_lines: [] }));
+        const [pls] = await db.execute('SELECT * FROM payment_voucher_payment_lines WHERE payment_voucher_id=? ORDER BY id', [pv.payment_voucher_id]);
+        payment_lines = pls;
+      } catch (e) {
+        console.warn('Failed to load payment_lines for PV', pv.payment_voucher_id, e && e.message ? e.message : e);
       }
+      try {
+        const [jls] = await db.execute('SELECT * FROM payment_voucher_journal_lines WHERE payment_voucher_id=? ORDER BY id', [pv.payment_voucher_id]);
+        journal_lines = jls;
+      } catch (e) {
+        console.warn('Failed to load journal_lines for PV', pv.payment_voucher_id, e && e.message ? e.message : e);
+      }
+
+      // Best-effort fetch of related display names (contact and COA)
+      let payee_name = pv.payee;
+      try {
+        // If payee looks like a numeric id, attempt to find contact
+        const maybeId = Number(pv.payee);
+        if (!Number.isNaN(maybeId)) {
+          const [crows] = await db.execute('SELECT display_name FROM contacts WHERE contact_id = ? LIMIT 1', [maybeId]);
+          if (Array.isArray(crows) && crows.length > 0) payee_name = crows[0].display_name || payee_name;
+        } else {
+          // try matching by display_name
+          const [crows] = await db.execute('SELECT display_name FROM contacts WHERE display_name = ? LIMIT 1', [pv.payee]);
+          if (Array.isArray(crows) && crows.length > 0) payee_name = crows[0].display_name || payee_name;
+        }
+      } catch (e) {
+        console.warn('Failed to resolve payee display name for PV', pv.payment_voucher_id, e && e.message ? e.message : e);
+      }
+
+      let coa_name = null;
+      try {
+        if (pv.coa_id) {
+          // Use COALESCE(account_name, name) in the SELECT to be tolerant of schema differences
+          const [cro] = await db.execute('SELECT COALESCE(account_name, name) AS account_name FROM chart_of_accounts WHERE coa_id = ? LIMIT 1', [pv.coa_id]);
+          if (Array.isArray(cro) && cro.length > 0) coa_name = cro[0].account_name || null;
+        }
+      } catch (e) {
+        console.warn('Failed to resolve COA name for PV', pv.payment_voucher_id, e && e.message ? e.message : e);
+      }
+
+      out.push(Object.assign({}, pv, { payment_lines, journal_lines, payee_name, coa_name }));
     }
     res.json(out);
   } catch (err) {
