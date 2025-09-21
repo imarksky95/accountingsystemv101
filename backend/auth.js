@@ -31,11 +31,14 @@ router.post('/login', async (req, res) => {
 
   try {
     const dbPool = req.app.get('dbPool');
+    const t0 = Date.now();
     const [rows] = await dbPool.execute('SELECT * FROM users WHERE username = ?', [username]);
+    const tDb = Date.now();
     const user = rows[0];
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
     const match = await bcrypt.compare(password, user.password_hash);
+    const tBcrypt = Date.now();
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
     const token = jwt.sign(
@@ -43,6 +46,8 @@ router.post('/login', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '1d' }
     );
+    const tJwt = Date.now();
+    console.log('Login timing (ms): db=', tDb - t0, 'bcrypt=', tBcrypt - tDb, 'jwt=', tJwt - tBcrypt);
 
     res.json({
       token,
