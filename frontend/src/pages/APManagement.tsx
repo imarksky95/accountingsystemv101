@@ -14,7 +14,6 @@ const APManagement: React.FC = () => {
 		return (
 			<Box>
 				<h2>AP Management Module</h2>
-				<div style={{marginBottom:8,fontSize:12,color:'#666'}}>API base: {API_BASE}</div>
 			<Paper>
 				<Tabs value={tab} onChange={(e, v) => setTab(v)} indicatorColor="primary" textColor="primary">
 					<Tab label="Payment Vouchers" />
