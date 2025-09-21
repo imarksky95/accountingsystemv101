@@ -29,9 +29,15 @@ router.get('/', async (req, res) => {
     // For each payment voucher, fetch associated payment_lines and journal_lines
     const results = [];
     for (const pv of rows) {
-      const [paymentLines] = await dbPool.execute('SELECT * FROM payment_voucher_payment_lines WHERE payment_voucher_id=? ORDER BY id', [pv.payment_voucher_id]);
-      const [journalLines] = await dbPool.execute('SELECT * FROM payment_voucher_journal_lines WHERE payment_voucher_id=? ORDER BY id', [pv.payment_voucher_id]);
-      results.push(Object.assign({}, pv, { payment_lines: paymentLines, journal_lines: journalLines }));
+      try {
+        const [paymentLines] = await dbPool.execute('SELECT * FROM payment_voucher_payment_lines WHERE payment_voucher_id=? ORDER BY id', [pv.payment_voucher_id]);
+        const [journalLines] = await dbPool.execute('SELECT * FROM payment_voucher_journal_lines WHERE payment_voucher_id=? ORDER BY id', [pv.payment_voucher_id]);
+        results.push(Object.assign({}, pv, { payment_lines: paymentLines, journal_lines: journalLines }));
+      } catch (err) {
+        console.error('Error fetching lines for PV', pv.payment_voucher_id, err);
+        // push the PV row without lines so front-end can still show main list
+        results.push(Object.assign({}, pv, { payment_lines: [], journal_lines: [] }));
+      }
     }
     res.json(results);
   } catch (err) {
