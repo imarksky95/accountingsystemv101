@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const puppeteer = require('puppeteer');
 
 function getDbPool(req) { return req.app.get('dbPool'); }
 
@@ -268,6 +267,15 @@ router.get('/:id/pdf', async (req, res) => {
       </div>
     </body>
     </html>`;
+
+    // Try to load puppeteer lazily. If it's not installed on the host, return a 501
+    let puppeteer;
+    try {
+      puppeteer = require('puppeteer');
+    } catch (e) {
+      console.error('Puppeteer is not installed or failed to load:', e && e.message ? e.message : e);
+      return res.status(501).json({ error: 'Puppeteer is not available on this server. Install puppeteer and redeploy to enable PDF generation.' });
+    }
 
     // Launch puppeteer and render PDF
     const browser = await puppeteer.launch({ args: ['--no-sandbox','--disable-setuid-sandbox'] });
