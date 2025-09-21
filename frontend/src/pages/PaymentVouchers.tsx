@@ -597,17 +597,39 @@ const PaymentVouchers: React.FC = () => {
             if (!el) {
               setSnackMsg('Nothing to print'); setSnackSeverity('info'); setSnackOpen(true); return;
             }
-            const printHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Payment Voucher</title><style>body{font-family: Arial, sans-serif; color:#000; padding:20px;} table{width:100%;border-collapse:collapse;} th,td{padding:6px 4px;} th{border-bottom:1px solid #ccc;}</style></head><body>${el.innerHTML}</body></html>`;
-            const win = window.open('', '_blank', 'noopener');
-            if (!win) { setSnackMsg('Popup blocked. Allow popups and try again.'); setSnackSeverity('error'); setSnackOpen(true); return; }
-            // Write the full document then wait briefly before printing
+            // Embed a small script that triggers print when the new window finishes loading.
+            // This avoids calling print asynchronously from the opener (which many browsers block).
+            const printHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Payment Voucher</title><style>body{font-family: Arial, sans-serif; color:#000; padding:20px;} table{width:100%;border-collapse:collapse;} th,td{padding:6px 4px;} th{border-bottom:1px solid #ccc;}</style></head><body>${el.innerHTML}<script> (function(){ function doPrint(){ try{ window.focus(); window.print(); }catch(e){ console.error('Print failed', e); } } if(document.readyState==='complete'){ setTimeout(doPrint,50); } else { window.addEventListener('load', function(){ setTimeout(doPrint,50); }); } window.addEventListener('afterprint', function(){ try{ window.close(); }catch(e){} }); })(); <\/script></body></html>`;
+            const win = window.open('', '_blank');
+            if (!win) {
+              // Popup blocked — fallback to printing via a hidden iframe which is less likely to be blocked.
+              try {
+                const iframe = document.createElement('iframe');
+                iframe.style.position = 'fixed'; iframe.style.right = '0'; iframe.style.bottom = '0'; iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0';
+                document.body.appendChild(iframe);
+                const idoc = iframe.contentWindow?.document;
+                if (!idoc) throw new Error('iframe doc unavailable');
+                idoc.open();
+                idoc.write(printHtml);
+                idoc.close();
+                const tryPrint = () => {
+                  try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch (e) { console.error('Iframe print failed', e); setSnackMsg('Print failed in iframe'); setSnackSeverity('error'); setSnackOpen(true); }
+                  setTimeout(() => { try { document.body.removeChild(iframe); } catch (e) {} }, 500);
+                };
+                // Some browsers need onload
+                iframe.onload = tryPrint;
+                // fallback timeout
+                setTimeout(tryPrint, 800);
+                return;
+              } catch (e:any) {
+                console.error('Print fallback failed', e);
+                setSnackMsg('Popup blocked and fallback failed. Allow popups or use Download PDF.'); setSnackSeverity('error'); setSnackOpen(true);
+                return;
+              }
+            }
             win.document.open();
             win.document.write(printHtml);
             win.document.close();
-            try { win.focus(); } catch (e) { /* ignore */ }
-            setTimeout(() => {
-              try { win.print(); } catch (e) { console.error('Print failed', e); }
-            }, 600);
           }} variant="contained">Print / Save as PDF</Button>
         </DialogActions>
       </Dialog>
