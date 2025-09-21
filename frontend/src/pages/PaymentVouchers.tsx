@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useRef } from 'react';
 import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, Snackbar, Alert, CircularProgress, IconButton, Table, TableHead, TableRow, TableCell, TableBody, Checkbox } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
@@ -32,6 +32,7 @@ const PaymentVouchers: React.FC = () => {
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState<any>(emptyForm);
   const [expectedControl, setExpectedControl] = useState<string>('');
+  const firstFocusRef = useRef<HTMLInputElement | null>(null);
 
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -203,6 +204,15 @@ const PaymentVouchers: React.FC = () => {
     fetchAll();
   }, []);
 
+  // When dialog opens, move focus into the dialog to avoid leaving focus
+  // on an element that will be aria-hidden (prevents accessibility console warnings).
+  React.useEffect(() => {
+    if (open) {
+      // slight delay to allow dialog to mount
+      setTimeout(() => { try { firstFocusRef.current?.focus(); } catch (e) {} }, 0);
+    }
+  }, [open]);
+
   
 
   const confirmDelete = (id: number) => { setDeleteId(id); setConfirmOpen(true); };
@@ -297,7 +307,7 @@ const PaymentVouchers: React.FC = () => {
         <DialogContent>
           {/* Basic Details */}
           <Box sx={{display:'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb:2}}>
-            <TextField label="Preparation Date" type="date" value={form.preparation_date || ''} onChange={e => setForm({...form, preparation_date: e.target.value})} InputLabelProps={{ shrink: true }} />
+            <TextField inputRef={firstFocusRef} label="Preparation Date" type="date" value={form.preparation_date || ''} onChange={e => setForm({...form, preparation_date: e.target.value})} InputLabelProps={{ shrink: true }} />
             <FormControl>
               <InputLabel id="purpose-label">Purpose</InputLabel>
               <Select labelId="purpose-label" value={form.purpose || ''} label="Purpose" onChange={e => setForm({...form, purpose: e.target.value})}>
