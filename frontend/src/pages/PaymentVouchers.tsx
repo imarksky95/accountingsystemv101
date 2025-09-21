@@ -253,6 +253,7 @@ const PaymentVouchers: React.FC = () => {
               <TableCell>Prepared</TableCell>
               <TableCell>Purpose</TableCell>
               <TableCell>Amount</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -263,10 +264,14 @@ const PaymentVouchers: React.FC = () => {
                 <TableCell>{pv.preparation_date} by {pv.prepared_by_username || pv.prepared_by}</TableCell>
                 <TableCell>{pv.purpose || '-'}</TableCell>
                 <TableCell>{pv.amount_to_pay}</TableCell>
+                <TableCell>
+                  <Button size="small" onClick={() => openEdit(pv)} sx={{mr:1}}>Edit</Button>
+                  <Button size="small" color="error" onClick={() => confirmDelete(pv.payment_voucher_id)}>Delete</Button>
+                </TableCell>
               </TableRow>
             ))}
             {items.length === 0 && (
-              <TableRow><TableCell colSpan={5}>No payment vouchers found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6}>No payment vouchers found.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
