@@ -1,15 +1,16 @@
-HTTP/2 501 
-date: Sun, 21 Sep 2025 17:10:22 GMT
-content-type: application/json; charset=utf-8
+HTTP/2 200 
+date: Sun, 21 Sep 2025 17:46:16 GMT
+content-type: application/pdf
+content-length: 33989
 access-control-allow-credentials: true
-etag: W/"6f-g4VLiRbayxy6ej8pUprBA/lcLsI"
-rndr-id: c385f63e-b3cf-495d
+content-disposition: attachment; filename="PV-2.pdf"
+etag: W/"84c5-oGln1pfcJVLymlpvqEeiY+IytS0"
+rndr-id: c2590f64-0cf7-458b
 vary: Origin
-vary: Accept-Encoding
 x-powered-by: Express
 x-render-origin-server: Render
 cf-cache-status: DYNAMIC
 server: cloudflare
-cf-ray: 982b2ce6dda38820-SIN
+cf-ray: 982b613dc9d2ce6f-SIN
 alt-svc: h3=":443"; ma=86400
 
