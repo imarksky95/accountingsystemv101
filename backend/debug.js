@@ -21,4 +21,13 @@ router.get('/pv-status', async (req, res) => {
   }
 });
 
+// Expose last login timing info (in-memory)
+let lastLoginTiming = null;
+router.get('/last-login', (req, res) => {
+  res.json({ lastLoginTiming });
+});
+
+module.exports = router;
+
+
 module.exports = router;

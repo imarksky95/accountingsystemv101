@@ -47,7 +47,14 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1d' }
     );
     const tJwt = Date.now();
-    console.log('Login timing (ms): db=', tDb - t0, 'bcrypt=', tBcrypt - tDb, 'jwt=', tJwt - tBcrypt);
+    const timing = { db: tDb - t0, bcrypt: tBcrypt - tDb, jwt: tJwt - tBcrypt, total: tJwt - t0, at: new Date().toISOString() };
+    console.log('Login timing (ms):', timing);
+    try {
+      const fs = require('fs');
+      fs.writeFileSync('/tmp/last-login.json', JSON.stringify(timing));
+    } catch (e) {
+      console.error('Failed to write last-login timing file', e);
+    }
 
     res.json({
       token,
