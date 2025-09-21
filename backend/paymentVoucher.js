@@ -90,31 +90,52 @@ router.post('/', async (req, res) => {
   const db = getDbPool(req);
   const conn = await db.getConnection();
   try {
-    await conn.beginTransaction();
-    const [countRows] = await conn.execute('SELECT COUNT(*) as count FROM payment_vouchers');
-    const control = 'PV-' + (countRows[0].count + 1);
     const { status, preparation_date, purpose, paid_through, prepared_by, payee, description, amount_to_pay, coa_id, payment_lines, journal_lines } = req.body;
-    const params = [control, status, preparation_date, purpose, paid_through, prepared_by, payee, description, amount_to_pay, coerceNumberOrNull(coa_id)].map(v => v === undefined ? null : v);
-    const [r] = await conn.execute('INSERT INTO payment_vouchers (payment_voucher_control, status, preparation_date, purpose, paid_through, prepared_by, payee, description, amount_to_pay, coa_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', params);
-    const id = r.insertId;
-    if (Array.isArray(payment_lines)) {
-      for (const pl of payment_lines) {
-        await conn.execute('INSERT INTO payment_voucher_payment_lines (payment_voucher_id, payee_contact_id, payee_display, description, amount) VALUES (?, ?, ?, ?, ?)', [id, coerceNumberOrNull(pl.payee_contact_id), pl.payee_display || null, pl.description || null, pl.amount == null ? 0 : pl.amount]);
+    let lastErr = null;
+    // Retry loop to handle rare duplicate control collisions
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await conn.beginTransaction();
+        const [countRows] = await conn.execute('SELECT COUNT(*) as count FROM payment_vouchers');
+        const control = 'PV-' + (countRows[0].count + 1);
+        const params = [control, status, preparation_date, purpose, paid_through, prepared_by, payee, description, amount_to_pay, coerceNumberOrNull(coa_id)].map(v => v === undefined ? null : v);
+        const [r] = await conn.execute('INSERT INTO payment_vouchers (payment_voucher_control, status, preparation_date, purpose, paid_through, prepared_by, payee, description, amount_to_pay, coa_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', params);
+        const id = r.insertId;
+        if (Array.isArray(payment_lines)) {
+          for (const pl of payment_lines) {
+            await conn.execute('INSERT INTO payment_voucher_payment_lines (payment_voucher_id, payee_contact_id, payee_display, description, amount) VALUES (?, ?, ?, ?, ?)', [id, coerceNumberOrNull(pl.payee_contact_id), pl.payee_display || null, pl.description || null, pl.amount == null ? 0 : pl.amount]);
+          }
+        }
+        if (Array.isArray(journal_lines)) {
+          for (const jl of journal_lines) {
+            await conn.execute('INSERT INTO payment_voucher_journal_lines (payment_voucher_id, coa_id, debit, credit, remarks) VALUES (?, ?, ?, ?, ?)', [id, coerceNumberOrNull(jl.coa_id), jl.debit == null ? 0 : jl.debit, jl.credit == null ? 0 : jl.credit, jl.remarks || null]);
+          }
+        }
+        await conn.commit();
+        // Return created id and the control the server used
+        res.status(201).json({ payment_voucher_id: id, payment_voucher_control: control });
+        conn.release();
+        return;
+      } catch (err) {
+        await conn.rollback();
+        lastErr = err;
+        // If duplicate entry on control, try again (race condition)
+        if (err && err.code === 'ER_DUP_ENTRY') {
+          console.warn('Duplicate control detected, retrying insert (attempt)', attempt + 1);
+          continue;
+        }
+        console.error('POST /api/payment-vouchers failed during insert', err && err.stack ? err.stack : err);
+        // non-retryable error
+        res.status(500).json({ error: String(err && err.message ? err.message : err) });
+        conn.release();
+        return;
       }
     }
-    if (Array.isArray(journal_lines)) {
-      for (const jl of journal_lines) {
-        await conn.execute('INSERT INTO payment_voucher_journal_lines (payment_voucher_id, coa_id, debit, credit, remarks) VALUES (?, ?, ?, ?, ?)', [id, coerceNumberOrNull(jl.coa_id), jl.debit == null ? 0 : jl.debit, jl.credit == null ? 0 : jl.credit, jl.remarks || null]);
-      }
-    }
-    await conn.commit();
-    res.status(201).json({ payment_voucher_id: id });
-  } catch (err) {
-    await conn.rollback();
-    console.error('POST /api/payment-vouchers failed', err && err.stack ? err.stack : err);
-    res.status(500).json({ error: String(err && err.message ? err.message : err) });
+    // If we exit loop without returning, return last error
+    console.error('POST /api/payment-vouchers failed after retries', lastErr && lastErr.stack ? lastErr.stack : lastErr);
+    res.status(500).json({ error: String(lastErr && lastErr.message ? lastErr.message : lastErr) });
   } finally {
-    conn.release();
+    try { conn.release(); } catch (e) { /* ignore */ }
   }
 });
 
