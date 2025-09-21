@@ -88,10 +88,22 @@ router.put('/:id', async (req, res) => {
 router.get('/all/simple', async (req, res) => {
   try {
     const dbPool = getDbPool(req);
-  const [rows] = await dbPool.execute('SELECT coa_id, COALESCE(account_name, name) AS account_name FROM chart_of_accounts WHERE deleted = 0');
+    const [rows] = await dbPool.execute('SELECT coa_id, COALESCE(account_name, name) AS account_name FROM chart_of_accounts WHERE deleted = 0');
     res.json(rows);
   } catch (err) {
     console.error('COA API error (GET /all/simple):', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Fallback simple list that assumes `account_name` column exists (for older deployments)
+router.get('/all/simple/fallback', async (req, res) => {
+  try {
+    const dbPool = getDbPool(req);
+    const [rows] = await dbPool.execute('SELECT coa_id, account_name FROM chart_of_accounts WHERE deleted = 0');
+    res.json(rows);
+  } catch (err) {
+    console.error('COA API error (GET /all/simple/fallback):', err);
     res.status(500).json({ error: err.message });
   }
 });
