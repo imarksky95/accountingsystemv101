@@ -221,6 +221,43 @@ const PaymentVouchers: React.FC = () => {
     axios.get(`${API_BASE}/api/company-profile`).then(r => setCompanyProfile(r.data)).catch(() => setCompanyProfile(null));
   }, []);
 
+  const downloadPdf = async (pvId: number | string | undefined) => {
+    if (!pvId) return;
+    try {
+      const token = localStorage.getItem('token');
+      const headers: any = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const resp = await fetch(`${API_BASE}/api/payment-vouchers/${pvId}/pdf`, { headers });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        let msg = txt;
+        try { msg = JSON.parse(txt).error || txt; } catch (e) { msg = txt; }
+        setSnackMsg(msg || `PDF request failed: ${resp.status}`);
+        setSnackSeverity('error'); setSnackOpen(true);
+        return;
+      }
+      const ct = resp.headers.get('content-type') || '';
+      if (!ct.includes('application/pdf')) {
+        const txt = await resp.text();
+        let msg = txt;
+        try { msg = JSON.parse(txt).error || txt; } catch (e) { msg = txt; }
+        setSnackMsg(msg || 'Server did not return a PDF'); setSnackSeverity('error'); setSnackOpen(true);
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const disp = resp.headers.get('content-disposition') || '';
+      let filename = 'voucher.pdf';
+      const m = /filename="?([^";]+)"?/.exec(disp);
+      if (m && m[1]) filename = m[1];
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e:any) {
+      setSnackMsg(e?.message || 'Download failed'); setSnackSeverity('error'); setSnackOpen(true);
+    }
+  };
+
   
 
   const confirmDelete = (id: number) => { setDeleteId(id); setConfirmOpen(true); };
@@ -554,6 +591,7 @@ const PaymentVouchers: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPreviewOpen(false)}>Close</Button>
+          <Button onClick={() => previewItem && downloadPdf(previewItem.payment_voucher_id)} sx={{mr:1}}>Download PDF</Button>
           <Button onClick={() => {
             const el = document.getElementById('pv-print-area');
             if (!el) {
