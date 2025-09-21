@@ -82,6 +82,10 @@ app.use('/api/vendors', vendorsRoutes);
 const contactsRoutes = require('./contacts');
 app.use('/api/contacts', contactsRoutes);
 
+// Debug routes
+const debugRoutes = require('./debug');
+app.use('/api/debug', debugRoutes);
+
 // Role management (basic example)
 app.get('/api/roles', async (req, res, next) => {
   try {
