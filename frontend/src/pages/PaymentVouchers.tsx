@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useRef } from 'react';
+import React, { useState, useContext, useRef } from 'react';
 import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, Snackbar, Alert, CircularProgress, IconButton, Table, TableHead, TableRow, TableCell, TableBody, Checkbox } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
@@ -599,7 +599,7 @@ const PaymentVouchers: React.FC = () => {
             }
             // Embed a small script that triggers print when the new window finishes loading.
             // This avoids calling print asynchronously from the opener (which many browsers block).
-            const printHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Payment Voucher</title><style>body{font-family: Arial, sans-serif; color:#000; padding:20px;} table{width:100%;border-collapse:collapse;} th,td{padding:6px 4px;} th{border-bottom:1px solid #ccc;}</style></head><body>${el.innerHTML}<script> (function(){ function doPrint(){ try{ window.focus(); window.print(); }catch(e){ console.error('Print failed', e); } } if(document.readyState==='complete'){ setTimeout(doPrint,50); } else { window.addEventListener('load', function(){ setTimeout(doPrint,50); }); } window.addEventListener('afterprint', function(){ try{ window.close(); }catch(e){} }); })(); <\/script></body></html>`;
+            const printHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Payment Voucher</title><style>body{font-family: Arial, sans-serif; color:#000; padding:20px;} table{width:100%;border-collapse:collapse;} th,td{padding:6px 4px;} th{border-bottom:1px solid #ccc;}</style></head><body>${el.innerHTML}<script> (function(){ function doPrint(){ try{ window.focus(); window.print(); }catch(e){ console.error('Print failed', e); } } if(document.readyState==='complete'){ setTimeout(doPrint,50); } else { window.addEventListener('load', function(){ setTimeout(doPrint,50); }); } window.addEventListener('afterprint', function(){ try{ window.close(); }catch(e){} }); })(); </script></body></html>`;
             const win = window.open('', '_blank');
             if (!win) {
               // Popup blocked — fallback to printing via a hidden iframe which is less likely to be blocked.

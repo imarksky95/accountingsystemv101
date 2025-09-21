@@ -10,7 +10,6 @@ function TabPanel({ children, value, index }: any) {
 
 const APManagement: React.FC = () => {
 	const [tab, setTab] = React.useState(0);
-		const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
 		return (
 			<Box>
 				<h2>AP Management Module</h2>
