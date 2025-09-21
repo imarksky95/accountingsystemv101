@@ -555,18 +555,21 @@ const PaymentVouchers: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setPreviewOpen(false)}>Close</Button>
           <Button onClick={() => {
-            // open printable window
             const el = document.getElementById('pv-print-area');
-            if (!el) return;
+            if (!el) {
+              setSnackMsg('Nothing to print'); setSnackSeverity('info'); setSnackOpen(true); return;
+            }
+            const printHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Payment Voucher</title><style>body{font-family: Arial, sans-serif; color:#000; padding:20px;} table{width:100%;border-collapse:collapse;} th,td{padding:6px 4px;} th{border-bottom:1px solid #ccc;}</style></head><body>${el.innerHTML}</body></html>`;
             const win = window.open('', '_blank', 'noopener');
-            if (!win) return;
-            win.document.write('<html><head><title>Payment Voucher</title>');
-            win.document.write('<style>body{font-family: Arial, sans-serif; color:#000; padding:20px;} table{width:100%;border-collapse:collapse;} th,td{padding:6px 4px;} th{border-bottom:1px solid #ccc;}</style>');
-            win.document.write('</head><body>');
-            win.document.write(el.innerHTML);
-            win.document.write('</body></html>');
+            if (!win) { setSnackMsg('Popup blocked. Allow popups and try again.'); setSnackSeverity('error'); setSnackOpen(true); return; }
+            // Write the full document then wait briefly before printing
+            win.document.open();
+            win.document.write(printHtml);
             win.document.close();
-            setTimeout(() => { win.print(); }, 300);
+            try { win.focus(); } catch (e) { /* ignore */ }
+            setTimeout(() => {
+              try { win.print(); } catch (e) { console.error('Print failed', e); }
+            }, 600);
           }} variant="contained">Print / Save as PDF</Button>
         </DialogActions>
       </Dialog>
