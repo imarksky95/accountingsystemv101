@@ -31,6 +31,7 @@ const PaymentVouchers: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState<any>(emptyForm);
+  const [expectedControl, setExpectedControl] = useState<string>('');
 
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -165,6 +166,15 @@ const PaymentVouchers: React.FC = () => {
 
   const openNew = async () => {
     await Promise.all([fetchContacts(), fetchCoas()]);
+    // compute expected control based on current count (matches backend behavior)
+    try {
+      const res = await axios.get(`${API_BASE}/api/payment-vouchers/simple`);
+      const rows = Array.isArray(res.data) ? res.data : [];
+      setExpectedControl(`PV-${rows.length + 1}`);
+    } catch (e:any) {
+      console.warn('failed to compute expected control', e?.response?.data || e.message || e);
+      setExpectedControl('');
+    }
     setEditing(null);
     setForm({
       ...emptyForm,
@@ -179,6 +189,7 @@ const PaymentVouchers: React.FC = () => {
   const openEdit = async (pv: any) => {
     await Promise.all([fetchContacts(), fetchCoas()]);
     setEditing(pv);
+    setExpectedControl(pv.payment_voucher_control || '');
     setForm({
       ...pv,
       payment_lines: pv.payment_lines && pv.payment_lines.length ? pv.payment_lines : [{ payee_id: '', description: '', amount: 0 }],
@@ -282,7 +293,7 @@ const PaymentVouchers: React.FC = () => {
       </div>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="lg">
-        <DialogTitle>{editing ? 'Edit Payment Voucher' : 'New Payment Voucher'}<IconButton aria-label="close" onClick={() => setOpen(false)} sx={{position:'absolute', right:8, top:8}}><CloseIcon /></IconButton></DialogTitle>
+        <DialogTitle>{editing ? `Edit Payment Voucher (${expectedControl || (editing && editing.payment_voucher_control) || ''})` : `New Payment Voucher${expectedControl ? ' (expected: ' + expectedControl + ')' : ''}`}<IconButton aria-label="close" onClick={() => setOpen(false)} sx={{position:'absolute', right:8, top:8}}><CloseIcon /></IconButton></DialogTitle>
         <DialogContent>
           {/* Basic Details */}
           <Box sx={{display:'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb:2}}>
