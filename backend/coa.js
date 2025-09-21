@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
   try {
     const dbPool = getDbPool(req);
     const [rows] = await dbPool.execute(`
-  SELECT coa.*, COALESCE(parent.account_name, parent.name) AS parent_account_name
+      SELECT coa.*, COALESCE(parent.account_name, parent.name) AS parent_account_name
       FROM chart_of_accounts coa
       LEFT JOIN chart_of_accounts parent ON coa.parent_id = parent.coa_id
       WHERE coa.deleted = 0
