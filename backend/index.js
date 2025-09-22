@@ -39,7 +39,9 @@ app.use(cors({
 
 
 
-app.use(express.json());
+// Increase request body limits to allow base64 logo uploads (default is ~100kb)
+app.use(express.json({ limit: process.env.EXPRESS_JSON_LIMIT || '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: process.env.EXPRESS_URLENCODED_LIMIT || '5mb' }));
 
 // Database connection pool
 const dbPool = mysql.createPool({

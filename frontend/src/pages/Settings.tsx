@@ -37,6 +37,11 @@ const Settings: React.FC = () => {
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Client-side validation: allowed mime types and max size
+      const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+      const maxBytes = Number(process.env.REACT_APP_COMPANY_LOGO_MAX_BYTES || 1048576);
+      if (!allowed.includes(file.type)) { alert('Unsupported logo type. Allowed: png, jpeg, webp'); return; }
+      if (file.size > maxBytes) { alert(`Selected logo is too large (max ${maxBytes} bytes)`); return; }
       const reader = new FileReader();
       reader.onload = (ev) => {
         const base64 = ev.target?.result as string;
@@ -72,7 +77,9 @@ const Settings: React.FC = () => {
       });
       if (!res.ok) {
         const txt = await res.text();
-        throw new Error(txt || `Save failed: ${res.status}`);
+        let msg = txt;
+        try { const j = JSON.parse(txt); msg = j.error || JSON.stringify(j); } catch (e) {}
+        throw new Error(msg || `Save failed: ${res.status}`);
       }
       const data = await res.json();
       // Update local state with returned profile if provided
