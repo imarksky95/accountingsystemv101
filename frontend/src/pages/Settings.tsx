@@ -20,18 +20,10 @@ const Settings: React.FC = () => {
     tin: '',
     type: '',
   });
-  // Load company profile from backend on mount
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/api/company-profile`)
-      .then(res => res.json())
-      .then(data => {
-        setProfile(data);
-        if (data.logo) setLogoPreview(data.logo);
-        if (data.name) localStorage.setItem('companyName', data.name);
-      });
-  }, []);
+  // initial logo preview state and file input ref
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [saving, setSaving] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -55,31 +47,51 @@ const Settings: React.FC = () => {
     }
   };
 
-  // Load company profile from backend on mount and after save
-  const loadProfile = () => {
-  fetch(`${API_BASE_URL}/api/company-profile`)
-      .then(res => res.json())
-      .then(data => {
-        setProfile(data);
-        if (data.logo) setLogoPreview(data.logo);
-        if (data.name) localStorage.setItem('companyName', data.name);
-      });
+  // Load company profile from backend (single entry with id=1)
+  const loadProfile = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/company-profile`);
+      if (!res.ok) throw new Error(`Failed to load profile: ${res.status}`);
+      const data = await res.json();
+      setProfile({ logo: data.logo || '', name: data.name || '', address: data.address || '', tin: data.tin || '', type: data.type || '' });
+      setLogoPreview(data.logo || null);
+      if (data.name) localStorage.setItem('companyName', data.name);
+    } catch (err:any) {
+      console.error('loadProfile error', err);
+    }
   };
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  useEffect(() => { loadProfile(); }, []);
 
   const handleSave = async () => {
-    // Save to backend
-  await fetch(`${API_BASE_URL}/api/company-profile`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(profile),
-    });
-    // Save company name to localStorage for header
-    localStorage.setItem('companyName', profile.name);
-    loadProfile();
-    alert('Company Profile saved!');
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/company-profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `Save failed: ${res.status}`);
+      }
+      const data = await res.json();
+      // Update local state with returned profile if provided
+      if (data && data.profile) {
+        const p = data.profile;
+        setProfile({ logo: p.logo || '', name: p.name || '', address: p.address || '', tin: p.tin || '', type: p.type || '' });
+        setLogoPreview(p.logo || null);
+        if (p.name) localStorage.setItem('companyName', p.name);
+      } else {
+        // Fallback: reload from server
+        await loadProfile();
+      }
+      alert('Company Profile saved!');
+    } catch (err:any) {
+      console.error('Save profile error', err);
+      alert('Failed to save Company Profile: ' + (err.message || 'unknown'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -138,7 +150,7 @@ const Settings: React.FC = () => {
           ))}
         </TextField>
         <Box mt={2}>
-          <Button variant="contained" color="primary" onClick={handleSave}>Save</Button>
+          <Button variant="contained" color="primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
         </Box>
       </Paper>
       <Divider />
