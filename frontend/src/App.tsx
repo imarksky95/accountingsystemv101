@@ -1,4 +1,5 @@
 import React, { useContext, ReactElement } from 'react';
+import { CompanyProvider } from './CompanyContext';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -26,6 +27,7 @@ function ProtectedRoute({ children }: { children: ReactElement }) {
 
 function App() {
   return (
+    <CompanyProvider>
     <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -112,6 +114,7 @@ function App() {
   {/* Fallback route for any other path */}
   <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </CompanyProvider>
   );
 }
 

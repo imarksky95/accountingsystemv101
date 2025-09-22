@@ -11,6 +11,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import PaidIcon from '@mui/icons-material/Paid';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserContext } from '../UserContext';
+import { useCompany } from '../CompanyContext';
 
 const drawerWidth = 240;
 
@@ -38,8 +39,8 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   const handleToggle = () => setCollapsed((prev) => !prev);
 
-  // Read company name from localStorage (fallback to default)
-  const companyName = localStorage.getItem('companyName') || 'Cash Management System';
+  // Use companyName from CompanyContext
+  const { companyName } = useCompany();
 
   return (
     <Box sx={{ display: 'flex' }}>

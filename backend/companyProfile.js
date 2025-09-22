@@ -3,11 +3,35 @@ const router = express.Router();
 
 const mysql = require('mysql2/promise');
 
+// Cache for resolved column names to support migrations/compatibility
+let _cachedProfileCols = null;
+
+async function resolveProfileCols(dbPool) {
+  if (_cachedProfileCols) return _cachedProfileCols;
+  try {
+    const dbName = process.env.DB_NAME;
+    const [rows] = await dbPool.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'company_profile' AND COLUMN_NAME IN ('company_name','NAME','company_type','TYPE')`,
+      [dbName]
+    );
+    const colNames = rows.map(r => (r.COLUMN_NAME || r.column_name || '').toString());
+    const nameCol = colNames.includes('company_name') ? 'company_name' : (colNames.includes('NAME') ? 'NAME' : 'NAME');
+    const typeCol = colNames.includes('company_type') ? 'company_type' : (colNames.includes('TYPE') ? 'TYPE' : 'TYPE');
+    _cachedProfileCols = { nameCol, typeCol };
+    return _cachedProfileCols;
+  } catch (err) {
+    // Fallback to legacy names if detection fails
+    return { nameCol: 'NAME', typeCol: 'TYPE' };
+  }
+}
+
 // GET company profile
 router.get('/company-profile', async (req, res) => {
   try {
     const dbPool = req.app.get('dbPool');
-    const [rows] = await dbPool.execute('SELECT * FROM company_profile WHERE id=1');
+    const cols = await resolveProfileCols(dbPool);
+    const selectSql = `SELECT id, logo, ${cols.nameCol} as db_name, address, tin, ${cols.typeCol} as db_type, logo_mime, logo_size_bytes FROM company_profile WHERE id=1`;
+    const [rows] = await dbPool.execute(selectSql);
     if (rows.length > 0) {
       const row = rows[0];
       // If logo is stored as binary, convert to data URL for frontend consumption
@@ -24,10 +48,10 @@ router.get('/company-profile', async (req, res) => {
       const out = {
         id: row.id,
         logo: row.logo || '',
-        company_name: row.company_name || '',
+        company_name: row.db_name || '',
         address: row.address || '',
         tin: row.tin || '',
-        company_type: row.company_type || '',
+        company_type: row.db_type || '',
         logo_mime: row.logo_mime || null,
         logo_size_bytes: row.logo_size_bytes || null,
       };
@@ -66,7 +90,10 @@ router.post('/company-profile', async (req, res) => {
   const { logo, company_name, address, tin, company_type } = req.body;
   console.log('POST /api/company-profile received:', { company_name, address, tin, company_type, logoPresent: !!logo, logoType: typeof logo, logoLen: typeof logo === 'string' ? logo.length : (Buffer.isBuffer(logo) ? logo.length : null) });
   try {
-    const dbPool = req.app.get('dbPool');
+  const dbPool = req.app.get('dbPool');
+  const cols = await resolveProfileCols(dbPool);
+  const nameCol = cols.nameCol;
+  const typeCol = cols.typeCol;
   // Prepare logo parameter: if incoming value is a data URL, strip the prefix and convert to Buffer
   let logoParam = null;
   let logoMime = null;
@@ -116,19 +143,11 @@ router.post('/company-profile', async (req, res) => {
 
     // Build SQL and params depending on whether we have logo/mime/size
       if (logoParam !== null) {
-      await dbPool.execute(
-        `INSERT INTO company_profile (id, logo, logo_mime, logo_size_bytes, company_name, address, tin, company_type)
-         VALUES (1, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE logo=VALUES(logo), logo_mime=VALUES(logo_mime), logo_size_bytes=VALUES(logo_size_bytes), company_name=VALUES(company_name), address=VALUES(address), tin=VALUES(tin), company_type=VALUES(company_type)`,
-        [logoParam, logoMime, logoSize, company_name || null, address || null, tin || null, company_type || null]
-      );
+      const sql = `INSERT INTO company_profile (id, logo, logo_mime, logo_size_bytes, ${nameCol}, address, tin, ${typeCol})\n         VALUES (1, ?, ?, ?, ?, ?, ?, ?)\n         ON DUPLICATE KEY UPDATE logo=VALUES(logo), logo_mime=VALUES(logo_mime), logo_size_bytes=VALUES(logo_size_bytes), ${nameCol}=VALUES(${nameCol}), address=VALUES(address), tin=VALUES(tin), ${typeCol}=VALUES(${typeCol})`;
+      await dbPool.execute(sql, [logoParam, logoMime, logoSize, company_name || null, address || null, tin || null, company_type || null]);
     } else {
-      await dbPool.execute(
-        `INSERT INTO company_profile (id, company_name, address, tin, company_type)
-         VALUES (1, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE company_name=VALUES(company_name), address=VALUES(address), tin=VALUES(tin), company_type=VALUES(company_type)`,
-        [company_name || null, address || null, tin || null, company_type || null]
-      );
+      const sql = `INSERT INTO company_profile (id, ${nameCol}, address, tin, ${typeCol})\n         VALUES (1, ?, ?, ?, ?)\n         ON DUPLICATE KEY UPDATE ${nameCol}=VALUES(${nameCol}), address=VALUES(address), tin=VALUES(tin), ${typeCol}=VALUES(${typeCol})`;
+      await dbPool.execute(sql, [company_name || null, address || null, tin || null, company_type || null]);
     }
     res.json({ message: 'Profile saved', profile: { logo, logo_mime: logoMime, logo_size_bytes: logoSize, company_name, address, tin, company_type } });
   } catch (err) {

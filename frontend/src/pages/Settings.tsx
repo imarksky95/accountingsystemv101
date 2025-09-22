@@ -1,5 +1,6 @@
 
 import React, { useRef, useState, useEffect } from 'react';
+import { useCompany } from '../CompanyContext';
 import { Box, Typography, Paper, Divider, TextField, Button, MenuItem, Avatar } from '@mui/material';
 
 const companyTypes = [
@@ -13,6 +14,7 @@ const companyTypes = [
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
 
 const Settings: React.FC = () => {
+  const { setCompanyName } = useCompany();
   const [profile, setProfile] = useState({
     logo: '',
     company_name: '',
@@ -58,14 +60,13 @@ const Settings: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/api/company-profile`);
       if (!res.ok) throw new Error(`Failed to load profile: ${res.status}`);
       const data = await res.json();
-  setProfile({ logo: data.logo || '', company_name: data.company_name || '', address: data.address || '', tin: data.tin || '', company_type: data.company_type || '' });
-  setLogoPreview(data.logo || null);
-  if (data.company_name) localStorage.setItem('companyName', data.company_name);
-    } catch (err:any) {
-      console.error('loadProfile error', err);
+      setProfile({ logo: data.logo || '', company_name: data.company_name || '', address: data.address || '', tin: data.tin || '', company_type: data.company_type || '' });
+      setLogoPreview(data.logo || null);
+      if (data.company_name) setCompanyName(data.company_name);
+    } catch (err: any) {
+      console.error('Load profile error', err);
     }
   };
-  useEffect(() => { loadProfile(); }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -75,25 +76,13 @@ const Settings: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profile),
       });
-      if (!res.ok) {
-        const txt = await res.text();
-        let msg = txt;
-        try { const j = JSON.parse(txt); msg = j.error || JSON.stringify(j); } catch (e) {}
-        throw new Error(msg || `Save failed: ${res.status}`);
-      }
       const data = await res.json();
-      // Update local state with returned profile if provided
-      if (data && data.profile) {
-        const p = data.profile;
-        setProfile({ logo: p.logo || '', company_name: p.company_name || '', address: p.address || '', tin: p.tin || '', company_type: p.company_type || '' });
-        setLogoPreview(p.logo || null);
-        if (p.company_name) localStorage.setItem('companyName', p.company_name);
-      } else {
-        // Fallback: reload from server
-        await loadProfile();
-      }
+      if (!res.ok) throw new Error(data.message || 'Save failed');
+      setProfile({ logo: data.logo || '', company_name: data.company_name || '', address: data.address || '', tin: data.tin || '', company_type: data.company_type || '' });
+      setLogoPreview(data.logo || null);
+      if (data.company_name) setCompanyName(data.company_name);
       alert('Company Profile saved!');
-    } catch (err:any) {
+    } catch (err: any) {
       console.error('Save profile error', err);
       alert('Failed to save Company Profile: ' + (err.message || 'unknown'));
     } finally {
