@@ -20,9 +20,20 @@ router.get('/company-profile', async (req, res) => {
       } catch (e) {
         // ignore conversion errors and return raw value
       }
-      res.json(row);
+      // Map DB column names to friendly JSON keys
+      const out = {
+        id: row.id,
+        logo: row.logo || '',
+        company_name: row.company_name || '',
+        address: row.address || '',
+        tin: row.tin || '',
+        company_type: row.company_type || '',
+        logo_mime: row.logo_mime || null,
+        logo_size_bytes: row.logo_size_bytes || null,
+      };
+      res.json(out);
     } else {
-      res.json({ logo: '', name: '', address: '', tin: '', type: '' });
+      res.json({ logo: '', company_name: '', address: '', tin: '', company_type: '' });
     }
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -52,8 +63,8 @@ router.get('/company-profile/logo', async (req, res) => {
 
 // POST/PUT company profile
 router.post('/company-profile', async (req, res) => {
-  const { logo, name, address, tin, type } = req.body;
-  console.log('POST /api/company-profile received:', { name, address, tin, type, logoPresent: !!logo, logoType: typeof logo, logoLen: typeof logo === 'string' ? logo.length : (Buffer.isBuffer(logo) ? logo.length : null) });
+  const { logo, company_name, address, tin, company_type } = req.body;
+  console.log('POST /api/company-profile received:', { company_name, address, tin, company_type, logoPresent: !!logo, logoType: typeof logo, logoLen: typeof logo === 'string' ? logo.length : (Buffer.isBuffer(logo) ? logo.length : null) });
   try {
     const dbPool = req.app.get('dbPool');
   // Prepare logo parameter: if incoming value is a data URL, strip the prefix and convert to Buffer
@@ -104,22 +115,22 @@ router.post('/company-profile', async (req, res) => {
     }
 
     // Build SQL and params depending on whether we have logo/mime/size
-    if (logoParam !== null) {
+      if (logoParam !== null) {
       await dbPool.execute(
-        `INSERT INTO company_profile (id, logo, logo_mime, logo_size_bytes, name, address, tin, type)
+        `INSERT INTO company_profile (id, logo, logo_mime, logo_size_bytes, company_name, address, tin, company_type)
          VALUES (1, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE logo=VALUES(logo), logo_mime=VALUES(logo_mime), logo_size_bytes=VALUES(logo_size_bytes), name=VALUES(name), address=VALUES(address), tin=VALUES(tin), type=VALUES(type)`,
-        [logoParam, logoMime, logoSize, name, address, tin, type]
+         ON DUPLICATE KEY UPDATE logo=VALUES(logo), logo_mime=VALUES(logo_mime), logo_size_bytes=VALUES(logo_size_bytes), company_name=VALUES(company_name), address=VALUES(address), tin=VALUES(tin), company_type=VALUES(company_type)`,
+        [logoParam, logoMime, logoSize, company_name || null, address || null, tin || null, company_type || null]
       );
     } else {
       await dbPool.execute(
-        `INSERT INTO company_profile (id, name, address, tin, type)
+        `INSERT INTO company_profile (id, company_name, address, tin, company_type)
          VALUES (1, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE name=VALUES(name), address=VALUES(address), tin=VALUES(tin), type=VALUES(type)`,
-        [name, address, tin, type]
+         ON DUPLICATE KEY UPDATE company_name=VALUES(company_name), address=VALUES(address), tin=VALUES(tin), company_type=VALUES(company_type)`,
+        [company_name || null, address || null, tin || null, company_type || null]
       );
     }
-    res.json({ message: 'Profile saved', profile: { logo, logo_mime: logoMime, logo_size_bytes: logoSize, name, address, tin, type } });
+    res.json({ message: 'Profile saved', profile: { logo, logo_mime: logoMime, logo_size_bytes: logoSize, company_name, address, tin, company_type } });
   } catch (err) {
     console.error('company-profile save error:', err && err.stack ? err.stack : err);
     res.status(500).json({ error: err.message || 'Internal Server Error' });

@@ -15,10 +15,10 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://accountingsy
 const Settings: React.FC = () => {
   const [profile, setProfile] = useState({
     logo: '',
-    name: '',
+    company_name: '',
     address: '',
     tin: '',
-    type: '',
+    company_type: '',
   });
   // initial logo preview state and file input ref
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -31,7 +31,7 @@ const Settings: React.FC = () => {
   };
 
   const handleTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProfile((prev) => ({ ...prev, type: e.target.value }));
+    setProfile((prev) => ({ ...prev, company_type: e.target.value }));
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,9 +58,9 @@ const Settings: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/api/company-profile`);
       if (!res.ok) throw new Error(`Failed to load profile: ${res.status}`);
       const data = await res.json();
-      setProfile({ logo: data.logo || '', name: data.name || '', address: data.address || '', tin: data.tin || '', type: data.type || '' });
-      setLogoPreview(data.logo || null);
-      if (data.name) localStorage.setItem('companyName', data.name);
+  setProfile({ logo: data.logo || '', company_name: data.company_name || '', address: data.address || '', tin: data.tin || '', company_type: data.company_type || '' });
+  setLogoPreview(data.logo || null);
+  if (data.company_name) localStorage.setItem('companyName', data.company_name);
     } catch (err:any) {
       console.error('loadProfile error', err);
     }
@@ -85,9 +85,9 @@ const Settings: React.FC = () => {
       // Update local state with returned profile if provided
       if (data && data.profile) {
         const p = data.profile;
-        setProfile({ logo: p.logo || '', name: p.name || '', address: p.address || '', tin: p.tin || '', type: p.type || '' });
+        setProfile({ logo: p.logo || '', company_name: p.company_name || '', address: p.address || '', tin: p.tin || '', company_type: p.company_type || '' });
         setLogoPreview(p.logo || null);
-        if (p.name) localStorage.setItem('companyName', p.name);
+        if (p.company_name) localStorage.setItem('companyName', p.company_name);
       } else {
         // Fallback: reload from server
         await loadProfile();
@@ -121,8 +121,8 @@ const Settings: React.FC = () => {
         </Box>
         <TextField
           label="Company Name"
-          name="name"
-          value={profile.name}
+          name="company_name"
+          value={profile.company_name}
           onChange={handleInputChange}
           fullWidth
           margin="dense"
@@ -146,8 +146,8 @@ const Settings: React.FC = () => {
         <TextField
           select
           label="Company Type"
-          name="type"
-          value={profile.type}
+          name="company_type"
+          value={profile.company_type}
           onChange={handleTypeChange}
           fullWidth
           margin="dense"
