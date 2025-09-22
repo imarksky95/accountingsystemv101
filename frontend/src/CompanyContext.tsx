@@ -18,7 +18,7 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     let mounted = true;
-    const API_BASE = (process.env.REACT_APP_API_BASE_URL && process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '')) || window.location.origin;
+  const API_BASE = (process.env.REACT_APP_API_BASE_URL && process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '')) || window.location.origin || 'https://accountingsystemv101-1.onrender.com';
     const fetchProfile = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/company-profile`, { cache: 'no-store' });

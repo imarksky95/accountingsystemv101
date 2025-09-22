@@ -1,5 +1,5 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useCompany } from '../CompanyContext';
 import { Box, Typography, Paper, Divider, TextField, Button, MenuItem, Avatar } from '@mui/material';
 
@@ -77,6 +77,32 @@ const Settings: React.FC = () => {
       setSaving(false);
     }
   };
+
+  // Load existing profile on mount
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/company-profile`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!mounted) return;
+        setProfile({
+          logo: data.logo || '',
+          company_name: data.company_name || data.NAME || data.name || '',
+          address: data.address || '',
+          tin: data.tin || '',
+          company_type: data.company_type || data.TYPE || '',
+        });
+        setLogoPreview(data.logo || null);
+        if (data.company_name) setCompanyName(data.company_name);
+      } catch (err) {
+        console.debug('Settings: failed to load profile', err);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, [setCompanyName]);
 
   return (
     <Box p={2}>
