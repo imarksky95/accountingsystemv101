@@ -11,7 +11,7 @@ const companyTypes = [
 ];
 
 //API base recognition (can be overridden at build time)
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
+const API_BASE = (process.env.REACT_APP_API_BASE_URL && process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '')) || window.location.origin || 'https://accountingsystemv101-1.onrender.com';
 
 const Settings: React.FC = () => {
   const { setCompanyName } = useCompany();
@@ -59,7 +59,7 @@ const Settings: React.FC = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/company-profile`, {
+  const res = await fetch(`${API_BASE}/api/company-profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profile),

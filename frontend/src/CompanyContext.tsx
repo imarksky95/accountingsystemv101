@@ -18,9 +18,10 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     let mounted = true;
+    const API_BASE = (process.env.REACT_APP_API_BASE_URL && process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '')) || window.location.origin;
     const fetchProfile = async () => {
       try {
-        const res = await fetch('/api/company-profile', { cache: 'no-store' });
+        const res = await fetch(`${API_BASE}/api/company-profile`, { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
         const name = data.company_name ?? data.NAME ?? data.name ?? '';
@@ -30,7 +31,9 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
             localStorage.setItem('companyName', name);
           } catch {}
         }
-      } catch {}
+      } catch (err) {
+        console.debug('CompanyProvider: failed to fetch profile', err);
+      }
     };
     fetchProfile();
     return () => { mounted = false; };
