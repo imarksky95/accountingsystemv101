@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { useCompany } from '../CompanyContext';
 import { Box, Typography, Paper, Divider, TextField, Button, MenuItem, Avatar } from '@mui/material';
 
@@ -54,19 +54,7 @@ const Settings: React.FC = () => {
     }
   };
 
-  // Load company profile from backend (single entry with id=1)
-  const loadProfile = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/company-profile`);
-      if (!res.ok) throw new Error(`Failed to load profile: ${res.status}`);
-      const data = await res.json();
-      setProfile({ logo: data.logo || '', company_name: data.company_name || '', address: data.address || '', tin: data.tin || '', company_type: data.company_type || '' });
-      setLogoPreview(data.logo || null);
-      if (data.company_name) setCompanyName(data.company_name);
-    } catch (err: any) {
-      console.error('Load profile error', err);
-    }
-  };
+  
 
   const handleSave = async () => {
     setSaving(true);
