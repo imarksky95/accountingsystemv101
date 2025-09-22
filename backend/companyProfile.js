@@ -29,6 +29,27 @@ router.get('/company-profile', async (req, res) => {
   }
 });
 
+// Binary logo endpoint: returns raw image bytes with correct Content-Type for caching
+router.get('/company-profile/logo', async (req, res) => {
+  try {
+    const dbPool = req.app.get('dbPool');
+    const [rows] = await dbPool.execute('SELECT logo, logo_mime, logo_size_bytes FROM company_profile WHERE id=1');
+    if (!rows || rows.length === 0) return res.status(404).send('No company profile');
+    const row = rows[0];
+    if (!row.logo) return res.status(404).send('No logo available');
+    const buffer = Buffer.isBuffer(row.logo) ? row.logo : Buffer.from(row.logo);
+    const mime = row.logo_mime || 'application/octet-stream';
+    // Set caching headers (client can cache for an hour)
+    res.setHeader('Content-Type', mime);
+    if (row.logo_size_bytes) res.setHeader('Content-Length', row.logo_size_bytes);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.send(buffer);
+  } catch (err) {
+    console.error('company-profile logo error:', err && err.stack ? err.stack : err);
+    return res.status(500).json({ error: err.message || 'Internal Server Error' });
+  }
+});
+
 // POST/PUT company profile
 router.post('/company-profile', async (req, res) => {
   const { logo, name, address, tin, type } = req.body;
