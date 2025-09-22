@@ -5,6 +5,7 @@ import axios from 'axios';
 import { UserContext } from '../UserContext';
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
+console.debug && console.debug('PaymentVouchers: resolved API_BASE =', API_BASE);
 
 const emptyForm = {
   status: 'Draft',

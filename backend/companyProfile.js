@@ -20,8 +20,31 @@ async function resolveProfileCols(dbPool) {
     _cachedProfileCols = { nameCol, typeCol };
     return _cachedProfileCols;
   } catch (err) {
-    // Fallback to legacy names if detection fails
-    return { nameCol: 'NAME', typeCol: 'TYPE' };
+    console.error('resolveProfileCols detection error:', err && err.stack ? err.stack : err);
+    // As a safer fallback, prefer the modern column names but accept legacy ones.
+    // Try to probe the table quickly to see which column set works.
+    try {
+      // First try modern names
+      const [r1] = await dbPool.execute("SELECT company_name, company_type FROM company_profile LIMIT 1");
+      if (Array.isArray(r1)) {
+        _cachedProfileCols = { nameCol: 'company_name', typeCol: 'company_type' };
+        return _cachedProfileCols;
+      }
+    } catch (e1) {
+      // ignore and try legacy
+    }
+    try {
+      const [r2] = await dbPool.execute("SELECT NAME, TYPE FROM company_profile LIMIT 1");
+      if (Array.isArray(r2)) {
+        _cachedProfileCols = { nameCol: 'NAME', typeCol: 'TYPE' };
+        return _cachedProfileCols;
+      }
+    } catch (e2) {
+      // final fallback
+    }
+    // Final fallback: prefer modern names but accept that queries may fail later
+    _cachedProfileCols = { nameCol: 'company_name', typeCol: 'company_type' };
+    return _cachedProfileCols;
   }
 }
 
@@ -30,8 +53,21 @@ router.get('/company-profile', async (req, res) => {
   try {
     const dbPool = req.app.get('dbPool');
     const cols = await resolveProfileCols(dbPool);
-    const selectSql = `SELECT id, logo, ${cols.nameCol} as db_name, address, tin, ${cols.typeCol} as db_type, logo_mime, logo_size_bytes FROM company_profile WHERE id=1`;
-    const [rows] = await dbPool.execute(selectSql);
+    let selectSql = `SELECT id, logo, ${cols.nameCol} as db_name, address, tin, ${cols.typeCol} as db_type, logo_mime, logo_size_bytes FROM company_profile WHERE id=1`;
+    let rows;
+    try {
+      const result = await dbPool.execute(selectSql);
+      rows = result[0];
+    } catch (qerr) {
+      console.warn('company-profile initial select failed, trying alternate columns', qerr && qerr.message ? qerr.message : qerr);
+      // try the alternate set
+      const altCols = (cols.nameCol === 'company_name') ? { nameCol: 'NAME', typeCol: 'TYPE' } : { nameCol: 'company_name', typeCol: 'company_type' };
+      selectSql = `SELECT id, logo, ${altCols.nameCol} as db_name, address, tin, ${altCols.typeCol} as db_type, logo_mime, logo_size_bytes FROM company_profile WHERE id=1`;
+      const result2 = await dbPool.execute(selectSql);
+      rows = result2[0];
+      // update cache so future calls use working names
+      _cachedProfileCols = { nameCol: altCols.nameCol, typeCol: altCols.typeCol };
+    }
     if (rows.length > 0) {
       const row = rows[0];
       // If logo is stored as binary, convert to data URL for frontend consumption
@@ -142,12 +178,25 @@ router.post('/company-profile', async (req, res) => {
     }
 
     // Build SQL and params depending on whether we have logo/mime/size
+    const runInsert = async (useCols) => {
+      const nCol = useCols.nameCol;
+      const tCol = useCols.typeCol;
       if (logoParam !== null) {
-      const sql = `INSERT INTO company_profile (id, logo, logo_mime, logo_size_bytes, ${nameCol}, address, tin, ${typeCol})\n         VALUES (1, ?, ?, ?, ?, ?, ?, ?)\n         ON DUPLICATE KEY UPDATE logo=VALUES(logo), logo_mime=VALUES(logo_mime), logo_size_bytes=VALUES(logo_size_bytes), ${nameCol}=VALUES(${nameCol}), address=VALUES(address), tin=VALUES(tin), ${typeCol}=VALUES(${typeCol})`;
-      await dbPool.execute(sql, [logoParam, logoMime, logoSize, company_name || null, address || null, tin || null, company_type || null]);
-    } else {
-      const sql = `INSERT INTO company_profile (id, ${nameCol}, address, tin, ${typeCol})\n         VALUES (1, ?, ?, ?, ?)\n         ON DUPLICATE KEY UPDATE ${nameCol}=VALUES(${nameCol}), address=VALUES(address), tin=VALUES(tin), ${typeCol}=VALUES(${typeCol})`;
-      await dbPool.execute(sql, [company_name || null, address || null, tin || null, company_type || null]);
+        const sql = `INSERT INTO company_profile (id, logo, logo_mime, logo_size_bytes, ${nCol}, address, tin, ${tCol})\n           VALUES (1, ?, ?, ?, ?, ?, ?, ?)\n           ON DUPLICATE KEY UPDATE logo=VALUES(logo), logo_mime=VALUES(logo_mime), logo_size_bytes=VALUES(logo_size_bytes), ${nCol}=VALUES(${nCol}), address=VALUES(address), tin=VALUES(tin), ${tCol}=VALUES(${tCol})`;
+        await dbPool.execute(sql, [logoParam, logoMime, logoSize, company_name || null, address || null, tin || null, company_type || null]);
+      } else {
+        const sql = `INSERT INTO company_profile (id, ${nCol}, address, tin, ${tCol})\n           VALUES (1, ?, ?, ?, ?)\n           ON DUPLICATE KEY UPDATE ${nCol}=VALUES(${nCol}), address=VALUES(address), tin=VALUES(tin), ${tCol}=VALUES(${tCol})`;
+        await dbPool.execute(sql, [company_name || null, address || null, tin || null, company_type || null]);
+      }
+    };
+
+    try {
+      await runInsert({ nameCol, typeCol });
+    } catch (insErr) {
+      console.warn('company-profile insert with resolved cols failed, retrying with alternate cols', insErr && insErr.message ? insErr.message : insErr);
+      const alt = (nameCol === 'company_name') ? { nameCol: 'NAME', typeCol: 'TYPE' } : { nameCol: 'company_name', typeCol: 'company_type' };
+      await runInsert(alt);
+      _cachedProfileCols = { nameCol: alt.nameCol, typeCol: alt.typeCol };
     }
     res.json({ message: 'Profile saved', profile: { logo, logo_mime: logoMime, logo_size_bytes: logoSize, company_name, address, tin, company_type } });
   } catch (err) {
