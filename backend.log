@@ -1,2 +1,0 @@
-[dotenv@17.2.2] injecting env (5) from backend/.env -- tip: ⚙️  override existing env vars with { override: true }
-Server running on port 5000
