@@ -214,6 +214,12 @@ export default function UsersAndRoleSettings() {
 
               {tabIndex === 1 && (
                 <>
+                  <Box display="flex" justifyContent="flex-end" alignItems="center" mb={1}>
+                    {user && Number(user.role_id) === 1 && (
+                      <Button variant="outlined" size="small" onClick={() => setShowAddRole(true)}>ADD ROLE</Button>
+                    )}
+                  </Box>
+
                   <List dense disablePadding>
                     {roles.map(r => (
                       <ListItem key={r.role_id} secondaryAction={<Button size="small" onClick={() => openEditor(r)}>Edit</Button>} sx={{ py: 0.5 }}>
