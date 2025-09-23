@@ -234,7 +234,23 @@ router.get('/:id/pdf', async (req, res) => {
     const [[pv]] = await db.execute('SELECT * FROM payment_vouchers WHERE payment_voucher_id = ? LIMIT 1', [id]);
     if (!pv) return res.status(404).json({ error: 'Not found' });
     const [payment_lines] = await db.execute('SELECT * FROM payment_voucher_payment_lines WHERE payment_voucher_id = ? ORDER BY id', [id]);
-    const [journal_lines] = await db.execute('SELECT * FROM payment_voucher_journal_lines WHERE payment_voucher_id = ? ORDER BY id', [id]);
+    let [journal_lines] = await db.execute('SELECT * FROM payment_voucher_journal_lines WHERE payment_voucher_id = ? ORDER BY id', [id]);
+    // Resolve account_name for journal lines if possible
+    try {
+      const coaIds = Array.from(new Set((journal_lines || []).filter(j => j && j.coa_id).map(j => j.coa_id)));
+      if (coaIds.length) {
+        const placeholders = coaIds.map(() => '?').join(',');
+        const [croRows] = await db.execute(`SELECT coa_id, COALESCE(account_name, name) AS account_name FROM chart_of_accounts WHERE coa_id IN (${placeholders})`, coaIds);
+        const coaMap = {};
+        if (Array.isArray(croRows)) for (const r of croRows) coaMap[r.coa_id] = r.account_name || null;
+        for (const j of (journal_lines || [])) {
+          if (j && j.coa_id) j.account_name = coaMap[j.coa_id] || j.coa_name || null;
+          else if (j) j.account_name = j.coa_name || null;
+        }
+      } else {
+        for (const j of (journal_lines || [])) { if (j) j.account_name = j.coa_name || null; }
+      }
+    } catch (e) { console.warn('Failed to resolve account names for PDF journal lines', e && e.message ? e.message : e); }
     const [cpRows] = await db.execute('SELECT * FROM company_profile WHERE id = 1 LIMIT 1');
     const company = cpRows && cpRows.length ? cpRows[0] : { name: '', logo: '', address: '' };
 
@@ -288,7 +304,7 @@ router.get('/:id/pdf', async (req, res) => {
         <table>
           <thead><tr><th>COA</th><th class="right">Debit</th><th class="right">Credit</th></tr></thead>
           <tbody>
-            ${journal_lines.map(j => `<tr><td>${escapeHtml(j.coa_id||j.coa_name||'')}</td><td class="right">${Number(j.debit||0).toFixed(2)}</td><td class="right">${Number(j.credit||0).toFixed(2)}</td></tr>`).join('')}
+            ${journal_lines.map(j => `<tr><td>${escapeHtml(j.account_name||j.coa_name||'')}</td><td class="right">${Number(j.debit||0).toFixed(2)}</td><td class="right">${Number(j.credit||0).toFixed(2)}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
