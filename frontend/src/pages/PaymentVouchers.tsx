@@ -705,7 +705,7 @@ const PaymentVouchers: React.FC = () => {
             <div id="pv-print-area" style={{padding:20, fontFamily: 'Arial, sans-serif', color: '#000'}}>
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20}}>
                 <div>
-                  <div style={{fontSize:20, fontWeight:700}}>{companyProfile?.name || 'Company Name'}</div>
+                  <div style={{fontSize:20, fontWeight:700}}>{companyProfile?.company_name || companyProfile?.name || 'Company Name'}</div>
                   <div style={{fontSize:12}}>{companyProfile?.address || ''}</div>
                 </div>
                 <div>
@@ -748,6 +748,40 @@ const PaymentVouchers: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div style={{marginTop:20}}>
+                <div style={{display:'flex', justifyContent:'space-between'}}>
+                  <div style={{textAlign:'center', width:'30%'}}>
+                    <div style={{fontWeight:700}}>Prepared By</div>
+                    <div style={{marginTop:24}}>__________________</div>
+                    <div style={{marginTop:8, fontSize:12}}>{(() => {
+                      const v = previewItem.prepared_by || previewItem.prepared_by_manual || '';
+                      if (!v) return '';
+                      if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
+                      return v || '';
+                    })()}</div>
+                  </div>
+                  <div style={{textAlign:'center', width:'30%'}}>
+                    <div style={{fontWeight:700}}>Reviewed By</div>
+                    <div style={{marginTop:24}}>__________________</div>
+                    <div style={{marginTop:8, fontSize:12}}>{(() => {
+                      const v = previewItem.reviewed_by || previewItem.reviewed_by_manual || '';
+                      if (!v) return '';
+                      if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
+                      return v || '';
+                    })()}</div>
+                  </div>
+                  <div style={{textAlign:'center', width:'30%'}}>
+                    <div style={{fontWeight:700}}>Approved By</div>
+                    <div style={{marginTop:24}}>__________________</div>
+                    <div style={{marginTop:8, fontSize:12}}>{(() => {
+                      const v = previewItem.approved_by || previewItem.approved_by_manual || '';
+                      if (!v) return '';
+                      if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
+                      return v || '';
+                    })()}</div>
+                  </div>
+                </div>
               </div>
             </div>
           ) : <div>No preview data</div>}

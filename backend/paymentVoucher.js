@@ -3,6 +3,73 @@ const router = express.Router();
 
 function getDbPool(req) { return req.app.get('dbPool'); }
 
+// HTML builder for Payment Voucher (exported on the router for tests)
+function buildPaymentVoucherHtml(pvObj, payment_lines_arr, journal_lines_arr, companyObj, prepName, revName, appName) {
+  return `<!doctype html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>Payment Voucher ${pvObj.payment_voucher_control}</title>
+      <style>
+        body { font-family: Arial, sans-serif; color: #000; margin: 24px; }
+        .header { display:flex; justify-content:space-between; align-items:center; }
+        .company { font-size:18px; font-weight:700; }
+        .address { font-size:12px; }
+        .section { margin-top:16px; }
+        table { width:100%; border-collapse:collapse; margin-top:8px; }
+        th, td { padding:8px 6px; border-bottom:1px solid #ddd; }
+        .right { text-align:right; }
+        .signature { margin-top:36px; display:flex; justify-content:space-between; }
+        .sig-box { width:30%; text-align:center; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div>
+          <div class="company">${escapeHtml(companyObj.name || '')}</div>
+          <div class="address">${escapeHtml(companyObj.address || '')}</div>
+        </div>
+        <div>
+          ${companyObj.logo ? `<img src="${companyObj.logo}" style="height:70px;"/>` : ''}
+        </div>
+      </div>
+      <hr />
+      <div class="section">
+        <div><strong>PV Ctrl:</strong> ${escapeHtml(pvObj.payment_voucher_control || '')}</div>
+        <div><strong>Prepared:</strong> ${escapeHtml(pvObj.preparation_date || '')}</div>
+        <div><strong>Purpose:</strong> ${escapeHtml(pvObj.purpose || '')}</div>
+        <div class="right"><strong>Amount:</strong> PHP ${Number(pvObj.amount_to_pay||0).toFixed(2)}</div>
+      </div>
+      <div class="section">
+        <div style="font-weight:700;">Payment Details</div>
+        <table>
+          <thead><tr><th>Payee</th><th>Description</th><th class="right">Amount</th></tr></thead>
+          <tbody>
+            ${payment_lines_arr.map(l => `<tr><td>${escapeHtml(l.payee_display||l.payee_name||l.payee_contact_id||'')}</td><td>${escapeHtml(l.description||'')}</td><td class="right">${Number(l.amount||0).toFixed(2)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="section">
+        <div style="font-weight:700;">Journal Entries</div>
+        <table>
+          <thead><tr><th>COA</th><th class="right">Debit</th><th class="right">Credit</th></tr></thead>
+          <tbody>
+            ${journal_lines_arr.map(j => `<tr><td>${escapeHtml(j.account_name||j.coa_name||'')}</td><td class="right">${Number(j.debit||0).toFixed(2)}</td><td class="right">${Number(j.credit||0).toFixed(2)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="signature">
+        <div class="sig-box">Prepared By<br/><br/>__________________<div style="margin-top:8px;font-size:12px">${escapeHtml(prepName || '')}</div></div>
+        <div class="sig-box">Reviewed By<br/><br/>__________________<div style="margin-top:8px;font-size:12px">${escapeHtml(revName || '')}</div></div>
+        <div class="sig-box">Approved By<br/><br/>__________________<div style="margin-top:8px;font-size:12px">${escapeHtml(appName || '')}</div></div>
+      </div>
+    </body>
+    </html>`;
+}
+
+// attach helper for tests at module load time
+router.buildPaymentVoucherHtml = buildPaymentVoucherHtml;
+
 // Use a defensive list: fetch raw payment_vouchers then attach related display names
 // separately. This avoids runtime SQL errors on deployments with differing schemas.
 
@@ -251,15 +318,42 @@ router.get('/:id/pdf', async (req, res) => {
         for (const j of (journal_lines || [])) { if (j) j.account_name = j.coa_name || null; }
       }
     } catch (e) { console.warn('Failed to resolve account names for PDF journal lines', e && e.message ? e.message : e); }
-    const [cpRows] = await db.execute('SELECT * FROM company_profile WHERE id = 1 LIMIT 1');
+    // Fetch company profile with flexible column names (company_name or NAME or name)
+    const [cpRows] = await db.execute("SELECT COALESCE(company_name, NAME, name) AS name, address, logo, logo_mime, logo_size_bytes FROM company_profile WHERE id = 1 LIMIT 1");
     const company = cpRows && cpRows.length ? cpRows[0] : { name: '', logo: '', address: '' };
 
+    // Resolve prepared/reviewed/approved names if numeric IDs are present on PV
+    const signatoryIds = [];
+    const preparedId = pv.prepared_by || pv.prepared_by_manual || null;
+    const reviewedId = pv.reviewed_by || pv.reviewed_by_manual || null;
+    const approvedId = pv.approved_by || pv.approved_by_manual || null;
+    if (preparedId && !isNaN(Number(preparedId))) signatoryIds.push(Number(preparedId));
+    if (reviewedId && !isNaN(Number(reviewedId))) signatoryIds.push(Number(reviewedId));
+    if (approvedId && !isNaN(Number(approvedId))) signatoryIds.push(Number(approvedId));
+    const signatoryMap = {};
+    try {
+      if (signatoryIds.length) {
+        const ids = Array.from(new Set(signatoryIds));
+        const placeholders = ids.map(() => '?').join(',');
+        const [users] = await db.execute(`SELECT user_id, COALESCE(full_name, username) AS full_name FROM users WHERE user_id IN (${placeholders})`, ids);
+        if (Array.isArray(users)) {
+          for (const u of users) signatoryMap[u.user_id] = u.full_name || String(u.user_id);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to resolve signatory names for PDF', e && e.message ? e.message : e);
+    }
+    const prepared_by_name = (!preparedId || isNaN(Number(preparedId))) ? (preparedId || '') : (signatoryMap[Number(preparedId)] || String(preparedId));
+    const reviewed_by_name = (!reviewedId || isNaN(Number(reviewedId))) ? (reviewedId || '') : (signatoryMap[Number(reviewedId)] || String(reviewedId));
+    const approved_by_name = (!approvedId || isNaN(Number(approvedId))) ? (approvedId || '') : (signatoryMap[Number(approvedId)] || String(approvedId));
+
     // Build HTML template
-    const html = `<!doctype html>
+    const buildPaymentVoucherHtml = (pvObj, payment_lines_arr, journal_lines_arr, companyObj, prepName, revName, appName) => {
+      return `<!doctype html>
     <html>
     <head>
       <meta charset="utf-8" />
-      <title>Payment Voucher ${pv.payment_voucher_control}</title>
+      <title>Payment Voucher ${pvObj.payment_voucher_control}</title>
       <style>
         body { font-family: Arial, sans-serif; color: #000; margin: 24px; }
         .header { display:flex; justify-content:space-between; align-items:center; }
@@ -276,26 +370,26 @@ router.get('/:id/pdf', async (req, res) => {
     <body>
       <div class="header">
         <div>
-          <div class="company">${escapeHtml(company.name || '')}</div>
-          <div class="address">${escapeHtml(company.address || '')}</div>
+          <div class="company">${escapeHtml(companyObj.name || '')}</div>
+          <div class="address">${escapeHtml(companyObj.address || '')}</div>
         </div>
         <div>
-          ${company.logo ? `<img src="${company.logo}" style="height:70px;"/>` : ''}
+          ${companyObj.logo ? `<img src="${companyObj.logo}" style="height:70px;"/>` : ''}
         </div>
       </div>
       <hr />
       <div class="section">
-        <div><strong>PV Ctrl:</strong> ${escapeHtml(pv.payment_voucher_control || '')}</div>
-        <div><strong>Prepared:</strong> ${escapeHtml(pv.preparation_date || '')}</div>
-        <div><strong>Purpose:</strong> ${escapeHtml(pv.purpose || '')}</div>
-        <div class="right"><strong>Amount:</strong> PHP ${Number(pv.amount_to_pay||0).toFixed(2)}</div>
+        <div><strong>PV Ctrl:</strong> ${escapeHtml(pvObj.payment_voucher_control || '')}</div>
+        <div><strong>Prepared:</strong> ${escapeHtml(pvObj.preparation_date || '')}</div>
+        <div><strong>Purpose:</strong> ${escapeHtml(pvObj.purpose || '')}</div>
+        <div class="right"><strong>Amount:</strong> PHP ${Number(pvObj.amount_to_pay||0).toFixed(2)}</div>
       </div>
       <div class="section">
         <div style="font-weight:700;">Payment Details</div>
         <table>
           <thead><tr><th>Payee</th><th>Description</th><th class="right">Amount</th></tr></thead>
           <tbody>
-            ${payment_lines.map(l => `<tr><td>${escapeHtml(l.payee_display||l.payee_name||l.payee_contact_id||'')}</td><td>${escapeHtml(l.description||'')}</td><td class="right">${Number(l.amount||0).toFixed(2)}</td></tr>`).join('')}
+            ${payment_lines_arr.map(l => `<tr><td>${escapeHtml(l.payee_display||l.payee_name||l.payee_contact_id||'')}</td><td>${escapeHtml(l.description||'')}</td><td class="right">${Number(l.amount||0).toFixed(2)}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
@@ -304,17 +398,21 @@ router.get('/:id/pdf', async (req, res) => {
         <table>
           <thead><tr><th>COA</th><th class="right">Debit</th><th class="right">Credit</th></tr></thead>
           <tbody>
-            ${journal_lines.map(j => `<tr><td>${escapeHtml(j.account_name||j.coa_name||'')}</td><td class="right">${Number(j.debit||0).toFixed(2)}</td><td class="right">${Number(j.credit||0).toFixed(2)}</td></tr>`).join('')}
+            ${journal_lines_arr.map(j => `<tr><td>${escapeHtml(j.account_name||j.coa_name||'')}</td><td class="right">${Number(j.debit||0).toFixed(2)}</td><td class="right">${Number(j.credit||0).toFixed(2)}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
       <div class="signature">
-        <div class="sig-box">Prepared By<br/><br/>__________________</div>
-        <div class="sig-box">Reviewed By<br/><br/>__________________</div>
-        <div class="sig-box">Approved By<br/><br/>__________________</div>
+        <div class="sig-box">Prepared By<br/><br/>__________________<div style="margin-top:8px;font-size:12px">${escapeHtml(prepName || '')}</div></div>
+        <div class="sig-box">Reviewed By<br/><br/>__________________<div style="margin-top:8px;font-size:12px">${escapeHtml(revName || '')}</div></div>
+        <div class="sig-box">Approved By<br/><br/>__________________<div style="margin-top:8px;font-size:12px">${escapeHtml(appName || '')}</div></div>
       </div>
     </body>
     </html>`;
+    };
+    // attach helper for tests
+    router.buildPaymentVoucherHtml = buildPaymentVoucherHtml;
+    const html = buildPaymentVoucherHtml(pv, payment_lines, journal_lines, company, prepared_by_name, reviewed_by_name, approved_by_name);
 
     // Try to load puppeteer lazily. If it's not installed on the host, return a 501
     let puppeteer;
