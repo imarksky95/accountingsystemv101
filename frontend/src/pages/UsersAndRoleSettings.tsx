@@ -34,8 +34,11 @@ function initials(name?: string) {
 }
 
 export default function UsersAndRoleSettings() {
-  const { roles, loading, updateRole } = useRoles();
+  console.debug && console.debug('UsersAndRoleSettings: component render');
+  const { roles, loading, updateRole, fetchRoles } = useRoles();
   const { user } = useContext(UserContext);
+  const [showAddRole, setShowAddRole] = useState(false);
+  const [newRoleName, setNewRoleName] = useState('');
   const [users, setUsers] = useState<any[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUser, setNewUser] = useState({ username: '', password: '', role_id: '' });
@@ -107,10 +110,15 @@ export default function UsersAndRoleSettings() {
             <>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                 <Typography variant="h6">Roles</Typography>
-                {/* Only show Add User to Super Admin (role_id === 1) */}
-                {user && Number(user.role_id) === 1 ? (
-                  <Button variant="contained" onClick={() => setShowAddUser(true)}>Add User</Button>
-                ) : null}
+                <Box display="flex" gap={1}>
+                  {/* Only show Add Role/User to Super Admin (role_id === 1) */}
+                  {user && Number(user.role_id) === 1 ? (
+                    <>
+                      <Button variant="outlined" onClick={() => setShowAddRole(true)}>Add Role</Button>
+                      <Button variant="contained" onClick={() => setShowAddUser(true)}>Add User</Button>
+                    </>
+                  ) : null}
+                </Box>
               </Box>
               <List>
                 {roles.map(r => (
@@ -192,6 +200,41 @@ export default function UsersAndRoleSettings() {
               setSnack({ open: true, message: 'Failed to add user', severity: 'error' });
             }
           }}>Add</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={showAddRole} onClose={() => setShowAddRole(false)}>
+        <DialogTitle>Add Role</DialogTitle>
+        <DialogContent>
+          <Box mt={1}>
+            <TextField label="Role Name" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} fullWidth />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAddRole(false)}>Cancel</Button>
+              <Button variant="contained" onClick={async () => {
+                if (!newRoleName.trim()) { setSnack({ open: true, message: 'Role name required', severity: 'error' }); return; }
+                try {
+                  const token = localStorage.getItem('token') || '';
+                  const res = await fetch(buildUrl('/api/roles'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+                    body: JSON.stringify({ role_name: newRoleName.trim() })
+                  });
+                  if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    setSnack({ open: true, message: err.error || 'Failed to add role', severity: 'error' });
+                    return;
+                  }
+                  await res.json();
+                  setSnack({ open: true, message: 'Role added', severity: 'success' });
+                  setShowAddRole(false);
+                  setNewRoleName('');
+                  try { await fetchRoles(); } catch (e) { /* ignore */ }
+                } catch (e) {
+                  setSnack({ open: true, message: 'Failed to add role', severity: 'error' });
+                }
+              }}>Add</Button>
         </DialogActions>
       </Dialog>
 

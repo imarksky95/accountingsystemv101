@@ -216,6 +216,49 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
       }
     });
 
+    // Create a new role (protected; only Super Admin role_id === 1)
+    app.post('/api/roles', authenticateToken, async (req, res, next) => {
+      try {
+        const actorRoleId = req.user && req.user.role_id;
+        if (!actorRoleId || Number(actorRoleId) !== 1) {
+          return res.status(403).json({ error: 'Forbidden: requires admin role' });
+        }
+        const { role_name } = req.body || {};
+        if (!role_name || String(role_name).trim().length === 0) return res.status(400).json({ error: 'Missing role_name' });
+
+        const sql = 'INSERT INTO roles (role_name) VALUES (?)';
+        const [result] = await dbPool.execute(sql, [String(role_name).trim()]);
+        const insertId = result && result.insertId ? result.insertId : null;
+        if (!insertId) return res.status(500).json({ error: 'Failed to create role' });
+
+        const [rows] = await dbPool.execute('SELECT * FROM roles WHERE role_id = ?', [insertId]);
+        const newRole = rows && rows[0] ? rows[0] : null;
+        if (!newRole) return res.status(500).json({ error: 'Role not found after insert' });
+
+        // Normalize reviewer/approver to arrays like the GET /api/roles route
+        const normalizeList = (val) => {
+          if (val == null) return [];
+          if (Array.isArray(val)) return val;
+          if (typeof val === 'string') {
+            const s = val.trim();
+            if (s.length === 0) return [];
+            try {
+              const parsed = JSON.parse(s);
+              if (Array.isArray(parsed)) return parsed;
+            } catch (e) {}
+            return s.split(',').map(x => { const t = x.trim(); if (/^\d+$/.test(t)) return Number(t); return t; }).filter(x => x !== '');
+          }
+          return [];
+        };
+
+        newRole.reviewer = normalizeList(newRole.reviewer);
+        newRole.approver = normalizeList(newRole.approver);
+        res.status(201).json(newRole);
+      } catch (err) {
+        next(err);
+      }
+    });
+
 // Global error logging middleware
 app.use((err, req, res, next) => {
   console.error('GLOBAL EXPRESS ERROR:', err);
