@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef } from 'react';
+import React, { useState, useContext, useRef, useCallback } from 'react';
 import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, Snackbar, Alert, CircularProgress, IconButton, Table, TableHead, TableRow, TableCell, TableBody, Checkbox } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
@@ -66,7 +66,7 @@ const PaymentVouchers: React.FC = () => {
   const [snackMsg, setSnackMsg] = useState('');
   const [snackSeverity, setSnackSeverity] = useState<'success' | 'error' | 'info'>('info');
 
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch payment vouchers, contacts, and coas independently so one failure doesn't block the others
@@ -154,7 +154,7 @@ const PaymentVouchers: React.FC = () => {
     } catch (e:any) {
       console.error('fetchAll error', e);
     } finally { setLoading(false); }
-  };
+  }, [userNames]);
 
   const fetchCoas = async () => {
     try {
@@ -333,7 +333,7 @@ const PaymentVouchers: React.FC = () => {
   // Prefetch data on mount for the overview and dialog selects
   React.useEffect(() => {
     fetchAll();
-  }, []);
+  }, [fetchAll]);
 
   // When dialog opens, move focus into the dialog to avoid leaving focus
   // on an element that will be aria-hidden (prevents accessibility console warnings).
@@ -465,7 +465,21 @@ const PaymentVouchers: React.FC = () => {
                 <TableCell>
                   <Button size="small" onClick={() => openEdit(pv)} sx={{mr:1}}>Edit</Button>
                   <Button size="small" color="error" onClick={() => confirmDelete(pv.payment_voucher_id)} sx={{mr:1}}>Delete</Button>
-                  <Button size="small" onClick={() => { setPreviewItem(pv); setPreviewOpen(true); }}>Preview</Button>
+                  <Button size="small" onClick={async () => {
+                    setPreviewItem(pv);
+                    try {
+                      if (!companyProfile) {
+                        const r = await tryFetchWithFallback('/api/company-profile', { cache: 'no-store' });
+                        if (r.ok) {
+                          const d = await r.json();
+                          setCompanyProfile(d);
+                        }
+                      }
+                    } catch (e) {
+                      // ignore failures; preview will show fallback text
+                    }
+                    setPreviewOpen(true);
+                  }}>Preview</Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -730,7 +744,7 @@ const PaymentVouchers: React.FC = () => {
                   </thead>
                   <tbody>
                     {(previewItem.journal_lines || []).map((j:any, i:number) => (
-                      <tr key={i}><td style={{padding:'6px 0'}}>{j.coa_id || j.account_name || j.coa_name || ''}</td><td style={{padding:'6px 0', textAlign:'right'}}>{Number(j.debit||0).toFixed(2)}</td><td style={{padding:'6px 0', textAlign:'right'}}>{Number(j.credit||0).toFixed(2)}</td></tr>
+                      <tr key={i}><td style={{padding:'6px 0'}}>{j.account_name || j.coa_name || ''}</td><td style={{padding:'6px 0', textAlign:'right'}}>{Number(j.debit||0).toFixed(2)}</td><td style={{padding:'6px 0', textAlign:'right'}}>{Number(j.credit||0).toFixed(2)}</td></tr>
                     ))}
                   </tbody>
                 </table>

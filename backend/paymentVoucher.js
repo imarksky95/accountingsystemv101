@@ -29,6 +29,27 @@ router.get('/', async (req, res) => {
         console.warn('Failed to load journal_lines for PV', pv.payment_voucher_id, e && e.message ? e.message : e);
       }
 
+      // Try to resolve account names for each journal line (attach account_name)
+      try {
+        const coaIds = Array.from(new Set((journal_lines || []).filter(j => j && j.coa_id).map(j => j.coa_id)));
+        if (coaIds.length) {
+          const placeholders = coaIds.map(() => '?').join(',');
+          const [croRows] = await db.execute(`SELECT coa_id, COALESCE(account_name, name) AS account_name FROM chart_of_accounts WHERE coa_id IN (${placeholders})`, coaIds);
+          const coaMap = {};
+          if (Array.isArray(croRows)) {
+            for (const r of croRows) coaMap[r.coa_id] = r.account_name || null;
+          }
+          for (const j of (journal_lines || [])) {
+            if (j && j.coa_id) j.account_name = coaMap[j.coa_id] || j.coa_name || null;
+            else if (j) j.account_name = j.coa_name || null;
+          }
+        } else {
+          for (const j of (journal_lines || [])) { if (j) j.account_name = j.coa_name || null; }
+        }
+      } catch (e) {
+        console.warn('Failed to resolve COA names for journal lines for PV', pv.payment_voucher_id, e && e.message ? e.message : e);
+      }
+
   // Best-effort fetch of related display names (contact and COA)
   // Since payee/coa/amount may be removed from main table, compute from lines when needed
   let payee_name = null;
