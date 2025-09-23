@@ -39,6 +39,8 @@ export default function UsersAndRoleSettings() {
   const { user } = useContext(UserContext);
   const [showAddRole, setShowAddRole] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
+  const [newRoleReviewers, setNewRoleReviewers] = useState<any[]>([]);
+  const [newRoleApprovers, setNewRoleApprovers] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUser, setNewUser] = useState({ username: '', password: '', role_id: '' });
@@ -209,6 +211,32 @@ export default function UsersAndRoleSettings() {
           <Box mt={1}>
             <TextField label="Role Name" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} fullWidth />
           </Box>
+          <Box mt={2}>
+            <Autocomplete
+              multiple
+              options={users}
+              getOptionLabel={(opt:any) => opt.username || String(opt.user_id)}
+              value={users.filter(u => newRoleReviewers.includes(u.user_id))}
+              onChange={(e, value:any[]) => setNewRoleReviewers(value.map(v => v.user_id))}
+              renderTags={(value:any[], getTagProps) => value.map((option, index) => (
+                <Chip label={option.username} {...getTagProps({ index })} />
+              ))}
+              renderInput={(params) => <TextField {...params} variant="outlined" label="Reviewer(s)" placeholder="Select reviewers" />}
+            />
+          </Box>
+          <Box mt={2}>
+            <Autocomplete
+              multiple
+              options={users}
+              getOptionLabel={(opt:any) => opt.username || String(opt.user_id)}
+              value={users.filter(u => newRoleApprovers.includes(u.user_id))}
+              onChange={(e, value:any[]) => setNewRoleApprovers(value.map(v => v.user_id))}
+              renderTags={(value:any[], getTagProps) => value.map((option, index) => (
+                <Chip label={option.username} {...getTagProps({ index })} />
+              ))}
+              renderInput={(params) => <TextField {...params} variant="outlined" label="Approver(s)" placeholder="Select approvers" />}
+            />
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowAddRole(false)}>Cancel</Button>
@@ -216,21 +244,35 @@ export default function UsersAndRoleSettings() {
                 if (!newRoleName.trim()) { setSnack({ open: true, message: 'Role name required', severity: 'error' }); return; }
                 try {
                   const token = localStorage.getItem('token') || '';
+                  const payload: any = { role_name: newRoleName.trim() };
+                  if (newRoleReviewers.length) payload.reviewer = newRoleReviewers;
+                  if (newRoleApprovers.length) payload.approver = newRoleApprovers;
+
                   const res = await fetch(buildUrl('/api/roles'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-                    body: JSON.stringify({ role_name: newRoleName.trim() })
+                    body: JSON.stringify(payload)
                   });
                   if (!res.ok) {
                     const err = await res.json().catch(() => ({}));
                     setSnack({ open: true, message: err.error || 'Failed to add role', severity: 'error' });
                     return;
                   }
-                  await res.json();
+                  const created = await res.json().catch(() => null);
                   setSnack({ open: true, message: 'Role added', severity: 'success' });
                   setShowAddRole(false);
                   setNewRoleName('');
-                  try { await fetchRoles(); } catch (e) { /* ignore */ }
+                  setNewRoleReviewers([]);
+                  setNewRoleApprovers([]);
+                  // refresh users and roles
+                  try {
+                    await fetchRoles();
+                    const res2 = await tryFetchWithFallback('/api/users', { cache: 'no-store', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
+                    if (res2.ok) {
+                      const d = await res2.json();
+                      setUsers(Array.isArray(d) ? d : []);
+                    }
+                  } catch (e) { /* ignore */ }
                 } catch (e) {
                   setSnack({ open: true, message: 'Failed to add role', severity: 'error' });
                 }

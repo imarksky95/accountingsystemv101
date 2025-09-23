@@ -223,11 +223,34 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
         if (!actorRoleId || Number(actorRoleId) !== 1) {
           return res.status(403).json({ error: 'Forbidden: requires admin role' });
         }
-        const { role_name } = req.body || {};
-        if (!role_name || String(role_name).trim().length === 0) return res.status(400).json({ error: 'Missing role_name' });
+            const { role_name, reviewer, approver } = req.body || {};
+            if (!role_name || String(role_name).trim().length === 0) return res.status(400).json({ error: 'Missing role_name' });
 
-        const sql = 'INSERT INTO roles (role_name) VALUES (?)';
-        const [result] = await dbPool.execute(sql, [String(role_name).trim()]);
+            // Prepare reviewer/approver values for storage. Accept arrays or comma-separated strings.
+            const prepareValueForInsert = (v) => {
+              if (v == null) return null;
+              if (Array.isArray(v)) return JSON.stringify(v);
+              if (typeof v === 'string') {
+                const s = v.trim();
+                if (s.length === 0) return null;
+                // if it looks like JSON array, keep it
+                try {
+                  const parsed = JSON.parse(s);
+                  if (Array.isArray(parsed)) return JSON.stringify(parsed);
+                } catch (e) {
+                  // not JSON
+                }
+                // store comma-separated string as-is
+                return s;
+              }
+              try { return JSON.stringify(v); } catch (e) { return String(v); }
+            };
+
+            const reviewerVal = prepareValueForInsert(reviewer);
+            const approverVal = prepareValueForInsert(approver);
+
+            const sql = 'INSERT INTO roles (role_name, reviewer, approver) VALUES (?, ?, ?)';
+            const [result] = await dbPool.execute(sql, [String(role_name).trim(), reviewerVal, approverVal]);
         const insertId = result && result.insertId ? result.insertId : null;
         if (!insertId) return res.status(500).json({ error: 'Failed to create role' });
 
