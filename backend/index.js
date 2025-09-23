@@ -216,6 +216,40 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
       }
     });
 
+        // Update user details (protected; only Super Admin role_id === 1)
+        app.put('/api/users/:user_id', authenticateToken, async (req, res, next) => {
+          try {
+            const actorRoleId = req.user && req.user.role_id;
+            if (!actorRoleId || Number(actorRoleId) !== 1) {
+              return res.status(403).json({ error: 'Forbidden: requires admin role' });
+            }
+            const userId = parseInt(req.params.user_id, 10);
+            if (Number.isNaN(userId)) return res.status(400).json({ error: 'Invalid user_id' });
+
+            const { username, role_id, full_name, email, mobile } = req.body || {};
+
+            const fields = [];
+            const params = [];
+            if (username !== undefined) { fields.push('username = ?'); params.push(String(username)); }
+            if (role_id !== undefined) { fields.push('role_id = ?'); params.push(Number(role_id)); }
+            if (full_name !== undefined) { fields.push('full_name = ?'); params.push(full_name || null); }
+            if (email !== undefined) { fields.push('email = ?'); params.push(email || null); }
+            if (mobile !== undefined) { fields.push('mobile = ?'); params.push(mobile || null); }
+
+            if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+            const sql = `UPDATE users SET ${fields.join(', ')} WHERE user_id = ?`;
+            params.push(userId);
+            const [result] = await dbPool.execute(sql, params);
+            if (result && result.affectedRows === 0) return res.status(404).json({ error: 'User not found' });
+
+            const [rows] = await dbPool.execute('SELECT user_id, username, role_id, full_name, email, mobile, created_at FROM users WHERE user_id = ?', [userId]);
+            res.json(rows && rows[0] ? rows[0] : {});
+          } catch (err) {
+            next(err);
+          }
+        });
+
     // Create a new role (protected; only Super Admin role_id === 1)
     app.post('/api/roles', authenticateToken, async (req, res, next) => {
       try {

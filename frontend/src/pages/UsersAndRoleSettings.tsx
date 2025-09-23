@@ -82,6 +82,21 @@ export default function UsersAndRoleSettings() {
     setOpen(true);
   }
 
+  // Edit user dialog
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editUserFullName, setEditUserFullName] = useState('');
+  const [editUserEmail, setEditUserEmail] = useState('');
+  const [editUserMobile, setEditUserMobile] = useState('');
+  const [editUserRoleId, setEditUserRoleId] = useState<any>('');
+
+  function openUserEditor(u: any) {
+    setEditingUser(u);
+    setEditUserFullName(u.full_name || '');
+    setEditUserEmail(u.email || '');
+    setEditUserMobile(u.mobile || '');
+    setEditUserRoleId(u.role_id || '');
+  }
+
   async function save() {
     if (!editing) return;
     setSaving(true);
@@ -146,10 +161,10 @@ export default function UsersAndRoleSettings() {
                 <Typography variant="h6">Users</Typography>
                 <List>
                   {users.map(u => (
-                    <ListItem key={u.user_id}>
-                      <ListItemText primary={u.username} secondary={`Role ID: ${u.role_id} • Created: ${u.created_at ? new Date(u.created_at).toLocaleString() : '—'}`} />
-                    </ListItem>
-                  ))}
+                      <ListItem key={u.user_id} secondaryAction={user && Number(user.role_id) === 1 ? <Button onClick={() => openUserEditor(u)}>Edit</Button> : null}>
+                        <ListItemText primary={u.username} secondary={`Role ID: ${u.role_id} • Created: ${u.created_at ? new Date(u.created_at).toLocaleString() : '—'}`} />
+                      </ListItem>
+                    ))}
                   {users.length === 0 && <ListItem><ListItemText primary="No users found or insufficient permissions." /></ListItem>}
                 </List>
               </Box>
@@ -339,6 +354,53 @@ export default function UsersAndRoleSettings() {
         <DialogActions>
           <Button onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
           <Button onClick={save} disabled={saving} variant="contained">{saving ? 'Saving...' : 'Save'}</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!editingUser} onClose={() => setEditingUser(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Edit User</DialogTitle>
+        <DialogContent>
+          <Box mt={1} display="flex" flexDirection="column" gap={2}>
+            <TextField label="Full name" value={editUserFullName} onChange={(e) => setEditUserFullName(e.target.value)} fullWidth />
+            <TextField label="Email" value={editUserEmail} onChange={(e) => setEditUserEmail(e.target.value)} fullWidth />
+            <TextField label="Mobile" value={editUserMobile} onChange={(e) => setEditUserMobile(e.target.value)} fullWidth />
+            <Autocomplete
+              options={roles}
+              getOptionLabel={(opt:any) => opt.role_name || String(opt.role_id)}
+              value={roles.find(r => Number(r.role_id) === Number(editUserRoleId)) || null}
+              onChange={(e, val:any) => setEditUserRoleId(val ? val.role_id : '')}
+              renderInput={(params) => <TextField {...params} label="Role" />}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditingUser(null)}>Cancel</Button>
+          <Button variant="contained" onClick={async () => {
+            if (!editingUser) return;
+            try {
+              const payload: any = { full_name: editUserFullName, email: editUserEmail, mobile: editUserMobile, role_id: Number(editUserRoleId) };
+              const token = localStorage.getItem('token') || '';
+              const res = await fetch(buildUrl(`/api/users/${editingUser.user_id}`), { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
+              if (!res.ok) {
+                const e = await res.json().catch(() => ({}));
+                setSnack({ open: true, message: e.error || 'Failed to update user', severity: 'error' });
+                return;
+              }
+              const updated = await res.json().catch(() => null);
+              setSnack({ open: true, message: 'User updated', severity: 'success' });
+              setEditingUser(null);
+              // Refresh users
+              try {
+                const res2 = await tryFetchWithFallback('/api/users', { cache: 'no-store', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
+                if (res2.ok) {
+                  const d = await res2.json();
+                  setUsers(Array.isArray(d) ? d : []);
+                }
+              } catch (e) { /* ignore */ }
+            } catch (e) {
+              setSnack({ open: true, message: 'Failed to update user', severity: 'error' });
+            }
+          }}>Save</Button>
         </DialogActions>
       </Dialog>
 
