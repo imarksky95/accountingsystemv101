@@ -77,6 +77,10 @@ router.post('/login', async (req, res) => {
         user_id: user.user_id,
         username: user.username,
         role_id: user.role_id,
+        reviewer_id: user.reviewer_id || null,
+        approver_id: user.approver_id || null,
+        reviewer_manual: user.reviewer_manual || null,
+        approver_manual: user.approver_manual || null,
         full_name: user.full_name || null,
         email: user.email || null,
         mobile: user.mobile || null,
@@ -106,10 +110,23 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     const dbPool = req.app.get('dbPool');
     const [rows] = await dbPool.execute(
-      'SELECT user_id, username, role_id, full_name, email, mobile FROM users WHERE user_id = ?',
+      'SELECT user_id, username, role_id, full_name, email, mobile, reviewer_id, approver_id, reviewer_manual, approver_manual FROM users WHERE user_id = ?',
       [req.user.user_id]
     );
-    res.json(rows[0]);
+    // Ensure the response always contains the workflow fields (null if missing)
+    const u = rows[0] || {};
+    res.json({
+      user_id: u.user_id,
+      username: u.username,
+      role_id: u.role_id,
+      full_name: u.full_name || null,
+      email: u.email || null,
+      mobile: u.mobile || null,
+      reviewer_id: u.reviewer_id || null,
+      approver_id: u.approver_id || null,
+      reviewer_manual: u.reviewer_manual || null,
+      approver_manual: u.approver_manual || null,
+    });
   } catch (err) {
     console.error('Fetch user error:', err);
     res.status(500).json({ message: 'Server error' });

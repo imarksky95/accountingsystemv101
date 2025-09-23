@@ -207,21 +207,38 @@ const PaymentVouchers: React.FC = () => {
     try {
       const me = refreshedUser as any;
       if (me) {
-        if (me.reviewer_id) reviewed_by_val = me.reviewer_id;
-        else if (me.reviewer_manual) reviewed_by_val = me.reviewer_manual;
-        if (me.approver_id) approved_by_val = me.approver_id;
-        else if (me.approver_manual) approved_by_val = me.approver_manual;
+        const _me: any = me;
+        if (_me.reviewer_id) reviewed_by_val = _me.reviewer_id;
+        else if (_me.reviewer_manual) reviewed_by_val = _me.reviewer_manual;
+        if (_me.approver_id) approved_by_val = _me.approver_id;
+        else if (_me.approver_manual) approved_by_val = _me.approver_manual;
       }
       // seed userNames cache with current user's full_name for prepared_by
       if (me && me.user_id) {
         setUserNames(prev => ({ ...prev, [String(me.user_id)]: me.full_name || me.username || String(me.user_id) }));
       }
+      // seed reviewer/approver names from refreshed user workflow if numeric
+      try {
+        const token = localStorage.getItem('token');
+        if (me && (me as any).reviewer_id && !isNaN(Number((me as any).reviewer_id))) {
+          const rid = String((me as any).reviewer_id);
+          axios.get(buildUrl(`/api/users/${rid}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+            .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [rid]: r.data.full_name || r.data.username || rid })); })
+            .catch(() => {});
+        }
+        if (me && (me as any).approver_id && !isNaN(Number((me as any).approver_id))) {
+          const aid = String((me as any).approver_id);
+          axios.get(buildUrl(`/api/users/${aid}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+            .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [aid]: r.data.full_name || r.data.username || aid })); })
+            .catch(() => {});
+        }
+      } catch (e) {}
     } catch (e) {}
 
     setForm({
       ...emptyForm,
       preparation_date: new Date().toISOString().slice(0,10),
-      prepared_by: user?.user_id || null,
+      prepared_by: (refreshedUser && refreshedUser.user_id) ? refreshedUser.user_id : (user?.user_id || null),
       reviewed_by: reviewed_by_val,
       approved_by: approved_by_val,
       // note: do not store separate display fields here; rely on userNames cache and user.full_name
@@ -560,13 +577,23 @@ const PaymentVouchers: React.FC = () => {
                   return user?.full_name || user?.username || '';
                 })()} disabled />
                 <TextField label="Reviewed By" value={(():any => {
-                  const v = form.reviewed_by;
+                  // Prefer explicitly set form value
+                  let v = form.reviewed_by;
+                  // fallback to current user's workflow settings if form not seeded
+                  if (!v) {
+                    const _u: any = user;
+                    v = (_u && _u.reviewer_id) ? _u.reviewer_id : (_u && _u.reviewer_manual ? _u.reviewer_manual : '');
+                  }
                   if (!v) return '';
                   if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
                   return v || '';
                 })()} onChange={e => setForm({...form, reviewed_by: e.target.value})} />
                 <TextField label="Approved By" value={(():any => {
-                  const v = form.approved_by;
+                  let v = form.approved_by;
+                  if (!v) {
+                    const _u: any = user;
+                    v = (_u && _u.approver_id) ? _u.approver_id : (_u && _u.approver_manual ? _u.approver_manual : '');
+                  }
                   if (!v) return '';
                   if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
                   return v || '';
