@@ -49,6 +49,7 @@ export default function UsersAndRoleSettings() {
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleReviewers, setNewRoleReviewers] = useState<any[]>([]);
   const [newRoleApprovers, setNewRoleApprovers] = useState<any[]>([]);
+  const [newRoleType, setNewRoleType] = useState<'none'|'reviewer'|'approver'|'both'>('none');
   const [users, setUsers] = useState<any[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUser, setNewUser] = useState({ username: '', password: '', role_id: '' });
@@ -59,6 +60,7 @@ export default function UsersAndRoleSettings() {
   const [editing, setEditing] = useState<any | null>(null);
   const [selReviewer, setSelReviewer] = useState<any[]>([]);
   const [selApprover, setSelApprover] = useState<any[]>([]);
+  const [editRoleType, setEditRoleType] = useState<'none'|'reviewer'|'approver'|'both'>('none');
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity?: 'success' | 'error' | 'info' }>({ open: false, message: '' });
 
@@ -87,6 +89,11 @@ export default function UsersAndRoleSettings() {
     setEditing(role);
     setSelReviewer(Array.isArray(role.reviewer) ? role.reviewer : []);
     setSelApprover(Array.isArray(role.approver) ? role.approver : []);
+    // infer role_type from existing role fields if available
+    const rHas = Array.isArray(role.reviewer) && role.reviewer.length > 0;
+    const aHas = Array.isArray(role.approver) && role.approver.length > 0;
+    const inferred: 'none'|'reviewer'|'approver'|'both' = rHas && aHas ? 'both' : rHas ? 'reviewer' : aHas ? 'approver' : (role.role_type || 'none');
+    setEditRoleType(inferred);
     setOpen(true);
   }
 
@@ -323,30 +330,12 @@ export default function UsersAndRoleSettings() {
             <TextField label="Role Name" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} fullWidth />
           </Box>
           <Box mt={2}>
-            <Autocomplete
-              multiple
-              options={users}
-              getOptionLabel={(opt:any) => opt.username || String(opt.user_id)}
-              value={users.filter(u => newRoleReviewers.includes(u.user_id))}
-              onChange={(e, value:any[]) => setNewRoleReviewers(value.map(v => v.user_id))}
-              renderTags={(value:any[], getTagProps) => value.map((option, index) => (
-                <Chip label={option.username} {...getTagProps({ index })} />
-              ))}
-              renderInput={(params) => <TextField {...params} variant="outlined" label="Reviewer(s)" placeholder="Select reviewers" />}
-            />
-          </Box>
-          <Box mt={2}>
-            <Autocomplete
-              multiple
-              options={users}
-              getOptionLabel={(opt:any) => opt.username || String(opt.user_id)}
-              value={users.filter(u => newRoleApprovers.includes(u.user_id))}
-              onChange={(e, value:any[]) => setNewRoleApprovers(value.map(v => v.user_id))}
-              renderTags={(value:any[], getTagProps) => value.map((option, index) => (
-                <Chip label={option.username} {...getTagProps({ index })} />
-              ))}
-              renderInput={(params) => <TextField {...params} variant="outlined" label="Approver(s)" placeholder="Select approvers" />}
-            />
+            <TextField select label="Role Type" value={newRoleType} onChange={(e) => setNewRoleType(e.target.value as any)} fullWidth SelectProps={{ native: true }}>
+              <option value="none">None</option>
+              <option value="reviewer">Reviewer</option>
+              <option value="approver">Approver</option>
+              <option value="both">Both</option>
+            </TextField>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -355,7 +344,8 @@ export default function UsersAndRoleSettings() {
                 if (!newRoleName.trim()) { setSnack({ open: true, message: 'Role name required', severity: 'error' }); return; }
                 try {
                   const token = localStorage.getItem('token') || '';
-                  const payload: any = { role_name: newRoleName.trim() };
+                  const payload: any = { role_name: newRoleName.trim(), role_type: newRoleType };
+                  // include reviewer/approver arrays only if provided by the UI (we keep them for backward compatibility)
                   if (newRoleReviewers.length) payload.reviewer = newRoleReviewers;
                   if (newRoleApprovers.length) payload.approver = newRoleApprovers;
 
@@ -375,6 +365,7 @@ export default function UsersAndRoleSettings() {
                   setNewRoleName('');
                   setNewRoleReviewers([]);
                   setNewRoleApprovers([]);
+                  setNewRoleType('none');
                   // refresh users and roles
                   try {
                     await fetchRoles();
@@ -394,6 +385,15 @@ export default function UsersAndRoleSettings() {
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Edit Role</DialogTitle>
         <DialogContent>
+          <Box mt={1} mb={2}>
+            <TextField select label="Role Type" value={editRoleType} onChange={(e) => setEditRoleType(e.target.value as any)} fullWidth SelectProps={{ native: true }}>
+              <option value="none">None</option>
+              <option value="reviewer">Reviewer</option>
+              <option value="approver">Approver</option>
+              <option value="both">Both</option>
+            </TextField>
+          </Box>
+
           <Box mt={1} mb={2}>
             <Autocomplete
               multiple
@@ -438,7 +438,20 @@ export default function UsersAndRoleSettings() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button onClick={save} disabled={saving} variant="contained">{saving ? 'Saving...' : 'Save'}</Button>
+          <Button onClick={async () => {
+            if (!editing) return;
+            setSaving(true);
+            try {
+              const payload: any = { reviewer: selReviewer, approver: selApprover, role_type: editRoleType };
+              await updateRole(editing.role_id, payload);
+              setOpen(false);
+              setSnack({ open: true, message: 'Role updated', severity: 'success' });
+            } catch (e) {
+              setSnack({ open: true, message: 'Failed to save role', severity: 'error' });
+            } finally {
+              setSaving(false);
+            }
+          }} disabled={saving} variant="contained">{saving ? 'Saving...' : 'Save'}</Button>
         </DialogActions>
       </Dialog>
 
