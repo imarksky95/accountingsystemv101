@@ -134,15 +134,15 @@ export default function UsersAndRoleSettings() {
   }
 
   return (
-    <Box p={2}>
+    <Box p={1}>
       <Grid container alignItems="center" justifyContent="space-between">
         <Grid item>
-          <Typography variant="h5">Users and Role Settings</Typography>
-          <Typography variant="body2" color="textSecondary">Manage which users can review or approve actions per role.</Typography>
+          <Typography variant="h6">Users and Role Settings</Typography>
+          <Typography variant="caption" color="textSecondary">Manage which users can review or approve actions per role.</Typography>
         </Grid>
       </Grid>
 
-      <Box mt={2}>
+      <Box mt={1}>
         {loading ? <CircularProgress /> : (
           roles.length === 0 ? (
             <Box p={2}>
@@ -150,8 +150,8 @@ export default function UsersAndRoleSettings() {
             </Box>
           ) : (
             <>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                <Typography variant="h6">Roles</Typography>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                <Typography variant="subtitle2">Roles</Typography>
                 <Box display="flex" gap={1}>
                   {/* Only show Add Role/User to Super Admin (role_id === 1) */}
                   {user && Number(user.role_id) === 1 ? (
@@ -162,9 +162,9 @@ export default function UsersAndRoleSettings() {
                   ) : null}
                 </Box>
               </Box>
-              <List>
+              <List dense disablePadding>
                 {roles.map(r => (
-                  <ListItem key={r.role_id} secondaryAction={<Button onClick={() => openEditor(r)}>Edit</Button>}>
+                  <ListItem key={r.role_id} secondaryAction={<Button size="small" onClick={() => openEditor(r)}>Edit</Button>} sx={{ py: 0.5 }}>
                     <ListItemText
                       primary={r.role_name}
                       secondary={
@@ -179,15 +179,15 @@ export default function UsersAndRoleSettings() {
                 ))}
               </List>
 
-              <Box mt={2}>
-                <Typography variant="h6">Users</Typography>
-                <List>
+              <Box mt={1}>
+                <Typography variant="subtitle2">Users</Typography>
+                <List dense disablePadding>
                   {users.map(u => (
-                      <ListItem key={u.user_id} secondaryAction={user && Number(user.role_id) === 1 ? <Button onClick={() => openUserEditor(u)}>Edit</Button> : null}>
-                        <ListItemText primary={u.username} secondary={`Role ID: ${u.role_id} • Created: ${u.created_at ? new Date(u.created_at).toLocaleString() : '—'}`} />
+                      <ListItem key={u.user_id} secondaryAction={user && Number(user.role_id) === 1 ? <Button size="small" onClick={() => openUserEditor(u)}>Edit</Button> : null} sx={{ py: 0.5 }}>
+                        <ListItemText primary={u.username} secondary={<span style={{ fontSize: '0.75rem', color: 'rgba(0,0,0,0.6)' }}>{`Role ID: ${u.role_id} • Created: ${u.created_at ? new Date(u.created_at).toLocaleString() : '—'}`}</span>} />
                       </ListItem>
                     ))}
-                  {users.length === 0 && <ListItem><ListItemText primary="No users found or insufficient permissions." /></ListItem>}
+                  {users.length === 0 && <ListItem dense><ListItemText primary="No users found or insufficient permissions." /></ListItem>}
                 </List>
               </Box>
             </>
