@@ -191,16 +191,30 @@ const PaymentVouchers: React.FC = () => {
       setExpectedControl('');
     }
     setEditing(null);
-    // derive signatories from current user's workflow settings (prefer id then manual)
+    // Refresh current user from server to ensure workflow fields are up-to-date
+    let refreshedUser: any = null;
+    try {
+      const token = localStorage.getItem('token');
+      const resp = await axios.get(buildUrl('/api/auth/me'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (resp && resp.data) refreshedUser = resp.data;
+    } catch (e) {
+      // fallback to local context
+      refreshedUser = user as any;
+    }
+    // derive signatories from refreshed user's workflow settings (prefer id then manual)
     let reviewed_by_val: any = '';
     let approved_by_val: any = '';
     try {
-      const me = user as any;
+      const me = refreshedUser as any;
       if (me) {
         if (me.reviewer_id) reviewed_by_val = me.reviewer_id;
         else if (me.reviewer_manual) reviewed_by_val = me.reviewer_manual;
         if (me.approver_id) approved_by_val = me.approver_id;
         else if (me.approver_manual) approved_by_val = me.approver_manual;
+      }
+      // seed userNames cache with current user's full_name for prepared_by
+      if (me && me.user_id) {
+        setUserNames(prev => ({ ...prev, [String(me.user_id)]: me.full_name || me.username || String(me.user_id) }));
       }
     } catch (e) {}
 
@@ -210,6 +224,7 @@ const PaymentVouchers: React.FC = () => {
       prepared_by: user?.user_id || null,
       reviewed_by: reviewed_by_val,
       approved_by: approved_by_val,
+      // note: do not store separate display fields here; rely on userNames cache and user.full_name
       // ensure at least one payment_line and one journal_line so selects render options
       payment_lines: [{ payee_id: '', description: '', amount: 0 }],
       journal_lines: [{ coa_id: '', debit: 0, credit: 0, remarks: '' }]
@@ -220,14 +235,18 @@ const PaymentVouchers: React.FC = () => {
       if (reviewed_by_val && !isNaN(Number(reviewed_by_val))) {
         const id = String(reviewed_by_val);
         axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-          .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id })); })
-          .catch(() => {});
+          .then(r => { if (r && r.data) {
+            setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id }));
+          } })
+          .catch(() => { /* ignore - we'll fallback to manual string in rendering */ });
       }
       if (approved_by_val && !isNaN(Number(approved_by_val))) {
         const id2 = String(approved_by_val);
         axios.get(buildUrl(`/api/users/${id2}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-          .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [id2]: r.data.full_name || r.data.username || id2 })); })
-          .catch(() => {});
+          .then(r => { if (r && r.data) {
+            setUserNames(prev => ({ ...prev, [id2]: r.data.full_name || r.data.username || id2 }));
+          } })
+          .catch(() => { /* ignore - manual fallback handled in UI */ });
       }
     } catch (e) {}
     setOpen(true);
@@ -244,7 +263,7 @@ const PaymentVouchers: React.FC = () => {
       approved_by: pv.approved_by || pv.approved_by_manual || ''
     });
     setOpen(true);
-    // Resolve prepared_by, reviewer, and approver numeric IDs to full_name for display
+    // Resolve prepared_by, reviewer, and approver numeric IDs to full_name (seed userNames cache)
     try {
       const token = localStorage.getItem('token');
       const idsToResolve: string[] = [];
@@ -257,7 +276,7 @@ const PaymentVouchers: React.FC = () => {
       for (const id of Array.from(new Set(idsToResolve))) {
         axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
           .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id })); })
-          .catch(() => {});
+          .catch(() => { /* ignore */ });
       }
     } catch (e) {}
   };
@@ -535,23 +554,21 @@ const PaymentVouchers: React.FC = () => {
             <Box sx={{fontWeight:700, mb:1}}>SIGNATORIES</Box>
             <Box sx={{display:'grid', gridTemplateColumns: '1fr 1fr 1fr', gap:2}}>
                 <TextField label="Prepared By" value={(() => {
-                  // Prefer prepared_by_username on the loaded form (editing existing PV)
-                  if (form && form.prepared_by_username) return form.prepared_by_username;
-                  // If form.prepared_by is a numeric id, try cached name
-                  if (form && form.prepared_by && !isNaN(Number(form.prepared_by))) {
-                    return userNames[String(form.prepared_by)] || String(form.prepared_by);
-                  }
-                  // Fallback to current user's full name or username
+                  // If editing and prepared_by numeric, prefer cached name, else use current user's full name
+                  const pid = form && form.prepared_by;
+                  if (pid && !isNaN(Number(pid))) return userNames[String(pid)] || String(pid);
                   return user?.full_name || user?.username || '';
                 })()} disabled />
                 <TextField label="Reviewed By" value={(():any => {
                   const v = form.reviewed_by;
-                  if (v && !isNaN(Number(v))) return userNames[String(v)] || String(v);
+                  if (!v) return '';
+                  if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
                   return v || '';
                 })()} onChange={e => setForm({...form, reviewed_by: e.target.value})} />
                 <TextField label="Approved By" value={(():any => {
                   const v = form.approved_by;
-                  if (v && !isNaN(Number(v))) return userNames[String(v)] || String(v);
+                  if (!v) return '';
+                  if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
                   return v || '';
                 })()} onChange={e => setForm({...form, approved_by: e.target.value})} />
               </Box>
