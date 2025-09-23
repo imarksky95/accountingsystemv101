@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRoles } from '../hooks/useRoles';
+import React, { useContext } from 'react';
 import {
   Box,
   Button,
@@ -20,6 +21,7 @@ import {
   Grid,
   Typography
 } from '@mui/material';
+import { UserContext } from '../UserContext';
 
 // Basic users fetch for multi-select options
 import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
@@ -105,7 +107,14 @@ export default function UsersAndRoleSettings() {
             <>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                 <Typography variant="h6">Roles</Typography>
-                <Button variant="contained" onClick={() => setShowAddUser(true)}>Add User</Button>
+                {/* Only show Add User to Super Admin (role_id === 1) */}
+                {(() => {
+                  const ctx = useContext(UserContext);
+                  const isAdmin = ctx.user && Number(ctx.user.role_id) === 1;
+                  return isAdmin ? (
+                    <Button variant="contained" onClick={() => setShowAddUser(true)}>Add User</Button>
+                  ) : null;
+                })()}
               </Box>
               <List>
                 {roles.map(r => (
@@ -157,6 +166,13 @@ export default function UsersAndRoleSettings() {
         <DialogActions>
           <Button onClick={() => setShowAddUser(false)}>Cancel</Button>
           <Button variant="contained" onClick={async () => {
+            const ctx = (React as any).useContext ? (React as any).useContext(UserContext) : null;
+            const isAdmin = ctx && ctx.user && Number(ctx.user.role_id) === 1;
+            if (!isAdmin) {
+              setSnack({ open: true, message: 'Forbidden: requires admin role', severity: 'error' });
+              setShowAddUser(false);
+              return;
+            }
             try {
               const payload = { username: newUser.username, password: newUser.password, role_id: Number(newUser.role_id) };
               const url = buildUrl('/api/auth/register');
