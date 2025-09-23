@@ -35,6 +35,8 @@ function initials(name?: string) {
 export default function UsersAndRoleSettings() {
   const { roles, loading, updateRole } = useRoles();
   const [users, setUsers] = useState<any[]>([]);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUser, setNewUser] = useState({ username: '', password: '', role_id: '' });
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [selReviewer, setSelReviewer] = useState<any[]>([]);
@@ -45,9 +47,15 @@ export default function UsersAndRoleSettings() {
   useEffect(() => {
     async function fetchUsers() {
       try {
-        const path = '/api/contacts';
-        console.debug && console.debug('UsersAndRoleSettings: fetching contacts via tryFetchWithFallback', path);
-        const res = await tryFetchWithFallback(path, { cache: 'no-store' });
+        // Fetch actual users list (requires admin privileges)
+        const path = '/api/users';
+        console.debug && console.debug('UsersAndRoleSettings: fetching users via tryFetchWithFallback', path);
+        const res = await tryFetchWithFallback(path, { cache: 'no-store', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
+        if (!res.ok) {
+          console.warn('Users API returned non-ok status', res.status);
+          setUsers([]);
+          return;
+        }
         const data = await res.json();
         setUsers(Array.isArray(data) ? data : []);
       } catch (e) {
@@ -94,25 +102,87 @@ export default function UsersAndRoleSettings() {
               <Typography>No roles found. Ensure the backend `/api/roles` endpoint is reachable and returns role rows.</Typography>
             </Box>
           ) : (
-            <List>
-              {roles.map(r => (
-                <ListItem key={r.role_id} secondaryAction={<Button onClick={() => openEditor(r)}>Edit</Button>}>
-                  <ListItemText
-                    primary={r.role_name}
-                    secondary={
-                      <>
-                        <strong>Reviewers:</strong> {(r.reviewer || []).map((id: any) => String(id)).join(', ') || '—'}
-                        <br />
-                        <strong>Approvers:</strong> {(r.approver || []).map((id: any) => String(id)).join(', ') || '—'}
-                      </>
-                    }
-                  />
-                </ListItem>
-              ))}
-            </List>
+            <>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="h6">Roles</Typography>
+                <Button variant="contained" onClick={() => setShowAddUser(true)}>Add User</Button>
+              </Box>
+              <List>
+                {roles.map(r => (
+                  <ListItem key={r.role_id} secondaryAction={<Button onClick={() => openEditor(r)}>Edit</Button>}>
+                    <ListItemText
+                      primary={r.role_name}
+                      secondary={
+                        <>
+                          <strong>Reviewers:</strong> {(r.reviewer || []).map((id: any) => String(id)).join(', ') || '—'}
+                          <br />
+                          <strong>Approvers:</strong> {(r.approver || []).map((id: any) => String(id)).join(', ') || '—'}
+                        </>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+
+              <Box mt={2}>
+                <Typography variant="h6">Users</Typography>
+                <List>
+                  {users.map(u => (
+                    <ListItem key={u.user_id}>
+                      <ListItemText primary={u.username} secondary={`Role ID: ${u.role_id} • Created: ${u.created_at ? new Date(u.created_at).toLocaleString() : '—'}`} />
+                    </ListItem>
+                  ))}
+                  {users.length === 0 && <ListItem><ListItemText primary="No users found or insufficient permissions." /></ListItem>}
+                </List>
+              </Box>
+            </>
           )
         )}
       </Box>
+
+      <Dialog open={showAddUser} onClose={() => setShowAddUser(false)}>
+        <DialogTitle>Add User</DialogTitle>
+        <DialogContent>
+          <Box mt={1} display="flex" flexDirection="column" gap={2}>
+            <TextField label="Username" value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} fullWidth />
+            <TextField label="Password" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} fullWidth />
+            <Autocomplete
+              options={roles}
+              getOptionLabel={(opt:any) => opt.role_name || String(opt.role_id)}
+              onChange={(e, val:any) => setNewUser({ ...newUser, role_id: val ? String(val.role_id) : '' })}
+              renderInput={(params) => <TextField {...params} label="Role" />}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAddUser(false)}>Cancel</Button>
+          <Button variant="contained" onClick={async () => {
+            try {
+              const payload = { username: newUser.username, password: newUser.password, role_id: Number(newUser.role_id) };
+              const url = buildUrl('/api/auth/register');
+              const token = localStorage.getItem('token') || '';
+              const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                setSnack({ open: true, message: err.message || 'Failed to add user', severity: 'error' });
+                return;
+              }
+              setSnack({ open: true, message: 'User added', severity: 'success' });
+              setShowAddUser(false);
+              // Refresh users
+              try {
+                const res2 = await tryFetchWithFallback('/api/users', { cache: 'no-store', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
+                if (res2.ok) {
+                  const d = await res2.json();
+                  setUsers(Array.isArray(d) ? d : []);
+                }
+              } catch (e) { /* ignore */ }
+            } catch (e) {
+              setSnack({ open: true, message: 'Failed to add user', severity: 'error' });
+            }
+          }}>Add</Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Edit Role</DialogTitle>

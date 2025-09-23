@@ -202,6 +202,20 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
   }
 });
 
+    // List users (protected; only Super Admin role_id === 1)
+    app.get('/api/users', authenticateToken, async (req, res, next) => {
+      try {
+        const actorRoleId = req.user && req.user.role_id;
+        if (!actorRoleId || Number(actorRoleId) !== 1) {
+          return res.status(403).json({ error: 'Forbidden: requires admin role' });
+        }
+        const [rows] = await dbPool.execute('SELECT user_id, username, role_id, created_at FROM users');
+        res.json(Array.isArray(rows) ? rows : []);
+      } catch (err) {
+        next(err);
+      }
+    });
+
 // Global error logging middleware
 app.use((err, req, res, next) => {
   console.error('GLOBAL EXPRESS ERROR:', err);
