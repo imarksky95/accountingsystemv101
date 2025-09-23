@@ -61,6 +61,8 @@ export default function UsersAndRoleSettings() {
   const [editRoleType, setEditRoleType] = useState<'none'|'reviewer'|'approver'|'both'>('none');
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity?: 'success' | 'error' | 'info' }>({ open: false, message: '' });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<any | null>(null);
 
   useEffect(() => {
     async function fetchUsers() {
@@ -159,7 +161,6 @@ export default function UsersAndRoleSettings() {
                     <Box>
                       {user && Number(user.role_id) === 1 && (
                         <>
-                          <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={() => setShowAddRole(true)}>ADD ROLE</Button>
                           <Button variant="contained" size="small" onClick={() => setShowAddUser(true)}>ADD USER</Button>
                         </>
                       )}
@@ -185,7 +186,12 @@ export default function UsersAndRoleSettings() {
                             <TableCell>{(roles.find(r => Number(r.role_id) === Number(u.role_id)) || {}).role_name || `ID ${u.role_id}`}</TableCell>
                             <TableCell>{u.created_at ? new Date(u.created_at).toLocaleString() : '—'}</TableCell>
                             <TableCell align="right">
-                              {user && Number(user.role_id) === 1 ? <Button size="small" onClick={() => openUserEditor(u)}>Edit</Button> : null}
+                              {user && Number(user.role_id) === 1 ? (
+                                <>
+                                  <Button size="small" onClick={() => openUserEditor(u)}>Edit</Button>
+                                    <Button size="small" onClick={() => { setUserToDelete(u); setShowDeleteConfirm(true); }} sx={{ ml: 1 }}>Delete</Button>
+                                </>
+                              ) : null}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -442,6 +448,40 @@ export default function UsersAndRoleSettings() {
               setSnack({ open: true, message: 'Failed to update user', severity: 'error' });
             }
           }}>Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setUserToDelete(null); }}>
+        <DialogTitle>Delete User</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete the user <strong>{userToDelete ? userToDelete.username : ''}</strong>? This action cannot be undone.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setShowDeleteConfirm(false); setUserToDelete(null); }}>Cancel</Button>
+            <Button variant="contained" onClick={async () => {
+            if (!userToDelete) return;
+            try {
+              const token = localStorage.getItem('token') || '';
+              const res = await fetch(buildUrl(`/api/users/${userToDelete.user_id}`), { method: 'DELETE', headers: { Authorization: token ? `Bearer ${token}` : '' } });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                setSnack({ open: true, message: err.error || 'Failed to delete user', severity: 'error' });
+                return;
+              }
+              setSnack({ open: true, message: 'User deleted', severity: 'success' });
+              setShowDeleteConfirm(false);
+              setUserToDelete(null);
+              try {
+                const res2 = await tryFetchWithFallback('/api/users', { cache: 'no-store', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
+                if (res2.ok) {
+                  const d = await res2.json();
+                  setUsers(Array.isArray(d) ? d : []);
+                }
+              } catch (e) { /* ignore */ }
+            } catch (e) {
+              setSnack({ open: true, message: 'Failed to delete user', severity: 'error' });
+            }
+          }} color="error">Delete</Button>
         </DialogActions>
       </Dialog>
 

@@ -257,6 +257,24 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
       }
     });
 
+    // Delete user (protected; only Super Admin role_id === 1)
+    app.delete('/api/users/:user_id', authenticateToken, async (req, res, next) => {
+      try {
+        const actorRoleId = req.user && req.user.role_id;
+        if (!actorRoleId || Number(actorRoleId) !== 1) {
+          return res.status(403).json({ error: 'Forbidden: requires admin role' });
+        }
+        const userId = parseInt(req.params.user_id, 10);
+        if (Number.isNaN(userId)) return res.status(400).json({ error: 'Invalid user_id' });
+
+        const [result] = await dbPool.execute('DELETE FROM users WHERE user_id = ?', [userId]);
+        if (result && result.affectedRows === 0) return res.status(404).json({ error: 'User not found' });
+        res.json({ success: true });
+      } catch (err) {
+        next(err);
+      }
+    });
+
 // Global error logging middleware
 app.use((err, req, res, next) => {
   console.error('GLOBAL EXPRESS ERROR:', err);
