@@ -12,10 +12,9 @@ const emptyForm = {
   purpose: '',
   paid_through: '',
   prepared_by: null,
-  payee: null,
   description: '',
-  amount_to_pay: '',
-  coa_id: null,
+  payment_lines: [],
+  journal_lines: [],
 };
 
 const PaymentVouchers: React.FC = () => {
@@ -281,7 +280,7 @@ const PaymentVouchers: React.FC = () => {
   const createDR = async () => {
     const ids = Object.keys(selected).filter(k => selected[+k]).map(k => +k);
     if (ids.length === 0) { setSnackMsg('Select at least one PV'); setSnackSeverity('info'); setSnackOpen(true); return; }
-    const amount_to_pay = items.filter(p => ids.includes(p.payment_voucher_id)).reduce((s, p) => s + (Number(p.amount_to_pay) || 0), 0);
+  const amount_to_pay = items.filter(p => ids.includes(p.payment_voucher_id)).reduce((s, p) => s + (Number(p.amount_to_pay) || (p.payment_lines && p.payment_lines.length ? p.payment_lines.reduce((ss:any,l:any)=>ss + (Number(l.amount)||0),0) : 0) ), 0);
     setCreatingDR(true);
     try {
       const token = localStorage.getItem('token');
@@ -331,7 +330,7 @@ const PaymentVouchers: React.FC = () => {
                 <TableCell>{pv.payment_voucher_control}</TableCell>
                 <TableCell>{pv.preparation_date} by {pv.prepared_by_username || pv.prepared_by}</TableCell>
                 <TableCell>{pv.purpose || '-'}</TableCell>
-                <TableCell>{pv.amount_to_pay}</TableCell>
+                <TableCell>{pv.amount_to_pay || (pv.payment_lines && pv.payment_lines.length ? pv.payment_lines.reduce((s:any,l:any)=>s + (Number(l.amount)||0),0) : 0)}</TableCell>
                 <TableCell>
                   <Button size="small" onClick={() => openEdit(pv)} sx={{mr:1}}>Edit</Button>
                   <Button size="small" color="error" onClick={() => confirmDelete(pv.payment_voucher_id)} sx={{mr:1}}>Delete</Button>
@@ -388,8 +387,6 @@ const PaymentVouchers: React.FC = () => {
                     <TableCell sx={{minWidth:200}}>
                       <Select fullWidth value={line.payee_id || line.payee || ''} onChange={e => {
                         const v = e.target.value; const copy = {...form}; copy.payment_lines[idx].payee_id = v; copy.payment_lines[idx].payee_name = contacts.find(c=>String(c.contact_id)===String(v))?.display_name || '' ;
-                        // set top-level payee to selected contact so listing shows friendly name
-                        copy.payee = v ? String(v) : copy.payee;
                         setForm(copy);
                       }}>
                         <MenuItem value="">-- Select Payee --</MenuItem>
@@ -419,8 +416,6 @@ const PaymentVouchers: React.FC = () => {
                 const copy = {...form};
                 copy.payment_lines = copy.payment_lines || [];
                 copy.payment_lines.push({payee_id:'', description:'', amount:0});
-                // if no top-level payee yet, set it to this line's payee (empty until user selects)
-                if (!copy.payee && copy.payment_lines.length === 1) copy.payee = '';
                 setForm(copy);
               }}>+ Add another line</Button>
             </Box>
@@ -504,17 +499,12 @@ const PaymentVouchers: React.FC = () => {
               return { payee_contact_id: contactId ? Number(contactId) : null, payee_display: display, description: l.description, amount: Number(l.amount) };
             });
 
-            // Set top-level payee so backend can JOIN and produce payee_name in list view. Use first payment line if present.
-            const topPayee = mappedPaymentLines.length > 0 && mappedPaymentLines[0].payee_contact_id ? String(mappedPaymentLines[0].payee_contact_id) : (form.payee || '');
-
             const payload = {
               status: form.status || 'Draft',
               preparation_date: form.preparation_date,
               purpose: form.purpose,
               paid_through: form.paid_through || 'Bank',
               prepared_by: user?.user_id || null,
-              payee: topPayee,
-              amount_to_pay: (form.payment_lines || []).reduce((s:any,l:any)=>s + (Number(l.amount)||0), 0),
               description: form.description || '',
               payment_lines: mappedPaymentLines,
               journal_lines: (form.journal_lines || []).map((l:any) => ({ coa_id: l.coa_id || null, debit: Number(l.debit)||0, credit: Number(l.credit)||0, remarks: l.remarks || '' })),
@@ -559,7 +549,7 @@ const PaymentVouchers: React.FC = () => {
                   <div><strong>Purpose:</strong> {previewItem.purpose}</div>
                 </div>
                 <div style={{textAlign:'right'}}>
-                  <div><strong>Amount:</strong> PHP {previewItem.amount_to_pay}</div>
+                  <div><strong>Amount:</strong> PHP {previewItem.amount_to_pay || (previewItem.payment_lines && previewItem.payment_lines.length ? previewItem.payment_lines.reduce((s:any,l:any)=>s + (Number(l.amount)||0),0) : 0)}</div>
                 </div>
               </div>
               <div style={{marginTop:20}}>

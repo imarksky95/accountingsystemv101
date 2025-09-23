@@ -17,7 +17,7 @@ const CheckVouchers: React.FC = () => {
       <Button onClick={() => window.location.reload()}>Refresh</Button>
       <ul>
         {items.map(cv => (
-          <li key={cv.check_voucher_id}>{cv.check_voucher_control} — {cv.payee} — {cv.amount_to_pay}</li>
+          <li key={cv.check_voucher_id}>{cv.check_voucher_control} — {cv.payee_name || (cv.payment_lines && cv.payment_lines[0] && (cv.payment_lines[0].payee_display || cv.payment_lines[0].payee_contact_id)) || ''} — {cv.amount_to_pay || (cv.payment_lines && cv.payment_lines.length ? cv.payment_lines.reduce((s:any,l:any)=>s + (Number(l.amount)||0),0) : 0)}</li>
         ))}
         {items.length === 0 && <li>No check vouchers found.</li>}
       </ul>

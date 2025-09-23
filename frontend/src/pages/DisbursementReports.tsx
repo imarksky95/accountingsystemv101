@@ -42,7 +42,7 @@ export default function DisbursementReports() {
             {pvList.map(pv => (
               <li key={pv.payment_voucher_id} style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
                 <input type="checkbox" checked={!!selected[pv.payment_voucher_id]} onChange={() => setSelected(prev=>({...prev,[pv.payment_voucher_id]: !prev[pv.payment_voucher_id]}))} />
-                <div>{pv.payment_voucher_control} — {pv.payee} — {pv.amount_to_pay}</div>
+                <div>{pv.payment_voucher_control} — {pv.payee_name || (pv.payment_lines && pv.payment_lines[0] && (pv.payment_lines[0].payee_display || pv.payment_lines[0].payee_contact_id)) || ''} — {pv.amount_to_pay || (pv.payment_lines && pv.payment_lines.length ? pv.payment_lines.reduce((s:any,l:any)=>s + (Number(l.amount)||0),0) : 0)}</div>
               </li>
             ))}
           </ul>
@@ -55,7 +55,7 @@ export default function DisbursementReports() {
                 setSnackOpen(true);
                 return;
               }
-              const amount_to_pay = pvList.filter(p => ids.includes(p.payment_voucher_id)).reduce((s, p) => s + (Number(p.amount_to_pay) || 0), 0);
+              const amount_to_pay = pvList.filter(p => ids.includes(p.payment_voucher_id)).reduce((s, p) => s + (Number(p.amount_to_pay) || (p.payment_lines && p.payment_lines.length ? p.payment_lines.reduce((ss:any,l:any)=>ss + (Number(l.amount)||0),0) : 0)), 0);
               setCreating(true);
               try {
                 const token = localStorage.getItem('token');
@@ -107,8 +107,8 @@ export default function DisbursementReports() {
                       {r.vouchers.map((v: any) => (
                         <tr key={v.payment_voucher_id}>
                           <td>{v.payment_voucher_control}</td>
-                          <td>{v.payee}</td>
-                          <td>{v.amount_to_pay}</td>
+                          <td>{v.payee_name || (v.payment_lines && v.payment_lines[0] && (v.payment_lines[0].payee_display || v.payment_lines[0].payee_contact_id)) || ''}</td>
+                          <td>{v.amount_to_pay || (v.payment_lines && v.payment_lines.length ? v.payment_lines.reduce((ss:any,l:any)=>ss + (Number(l.amount)||0),0) : 0)}</td>
                           <td>{v.preparation_date}</td>
                         </tr>
                       ))}

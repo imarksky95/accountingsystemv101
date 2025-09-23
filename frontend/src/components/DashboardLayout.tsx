@@ -42,6 +42,23 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
   // Use companyName from CompanyContext
   const { companyName } = useCompany();
 
+  // Compute display name, initials (first+last), and deterministic bg color based on user_id
+  const displayName = (user && (user.full_name || user.username)) || 'User';
+  const initials = (() => {
+    const parts = (displayName || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'U';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    const first = parts[0][0] || '';
+    const last = parts[parts.length - 1][0] || '';
+    return (first + last).toUpperCase();
+  })();
+
+  const avatarBg = (() => {
+    const palette = ['#F44336','#E91E63','#9C27B0','#673AB7','#3F51B5','#2196F3','#03A9F4','#00BCD4','#009688','#4CAF50','#8BC34A','#CDDC39','#FFC107','#FF9800','#FF5722','#795548'];
+    const id = user && user.user_id ? Number(user.user_id) : 0;
+    return palette[id % palette.length];
+  })();
+
   return (
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
@@ -70,16 +87,10 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       >
         <Toolbar />
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 2 }}>
-                {(() => {
-                  const displayName = (user && (user.full_name || user.username)) || 'User';
-                  const initial = displayName ? displayName.trim()[0].toUpperCase() : 'U';
-                  return (
-                    <>
-                      <Avatar sx={{ width: 64, height: 64, mb: 1 }}>{initial}</Avatar>
-                      {!collapsed && <Typography variant="subtitle1">{displayName}</Typography>}
-                    </>
-                  );
-                })()}
+                <>
+                  <Avatar sx={{ bgcolor: avatarBg, width: 64, height: 64, mb: 1 }}>{initials}</Avatar>
+                  {!collapsed && <Typography variant="subtitle1">{displayName}</Typography>}
+                </>
           {!collapsed && (
             <ListItemButton sx={{ mt: 2, color: 'red' }} onClick={handleLogout}>
               <ListItemText primary="Logout" />

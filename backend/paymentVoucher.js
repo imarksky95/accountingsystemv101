@@ -29,18 +29,20 @@ router.get('/', async (req, res) => {
         console.warn('Failed to load journal_lines for PV', pv.payment_voucher_id, e && e.message ? e.message : e);
       }
 
-      // Best-effort fetch of related display names (contact and COA)
-      let payee_name = pv.payee;
+  // Best-effort fetch of related display names (contact and COA)
+  // Since payee/coa/amount may be removed from main table, compute from lines when needed
+  let payee_name = null;
       try {
-        // If payee looks like a numeric id, attempt to find contact
-        const maybeId = Number(pv.payee);
-        if (!Number.isNaN(maybeId)) {
-          const [crows] = await db.execute('SELECT display_name FROM contacts WHERE contact_id = ? LIMIT 1', [maybeId]);
-          if (Array.isArray(crows) && crows.length > 0) payee_name = crows[0].display_name || payee_name;
-        } else {
-          // try matching by display_name
-          const [crows] = await db.execute('SELECT display_name FROM contacts WHERE display_name = ? LIMIT 1', [pv.payee]);
-          if (Array.isArray(crows) && crows.length > 0) payee_name = crows[0].display_name || payee_name;
+        // derive payee_name from first payment line if present
+        if (payment_lines && payment_lines.length > 0) {
+          const first = payment_lines[0];
+          if (first.payee_contact_id) {
+            const [crows] = await db.execute('SELECT display_name FROM contacts WHERE contact_id = ? LIMIT 1', [first.payee_contact_id]);
+            if (Array.isArray(crows) && crows.length > 0) payee_name = crows[0].display_name || first.payee_display || null;
+            else payee_name = first.payee_display || null;
+          } else {
+            payee_name = first.payee_display || null;
+          }
         }
       } catch (e) {
         console.warn('Failed to resolve payee display name for PV', pv.payment_voucher_id, e && e.message ? e.message : e);
@@ -48,16 +50,27 @@ router.get('/', async (req, res) => {
 
       let coa_name = null;
       try {
-        if (pv.coa_id) {
-          // Use COALESCE(account_name, name) in the SELECT to be tolerant of schema differences
-          const [cro] = await db.execute('SELECT COALESCE(account_name, name) AS account_name FROM chart_of_accounts WHERE coa_id = ? LIMIT 1', [pv.coa_id]);
+        // If journal lines exist, try to resolve COA from the first journal line that has a coa_id
+        const jlWithCoa = (journal_lines || []).find(j => j.coa_id);
+        if (jlWithCoa && jlWithCoa.coa_id) {
+          const [cro] = await db.execute('SELECT COALESCE(account_name, name) AS account_name FROM chart_of_accounts WHERE coa_id = ? LIMIT 1', [jlWithCoa.coa_id]);
           if (Array.isArray(cro) && cro.length > 0) coa_name = cro[0].account_name || null;
         }
       } catch (e) {
         console.warn('Failed to resolve COA name for PV', pv.payment_voucher_id, e && e.message ? e.message : e);
       }
 
-      out.push(Object.assign({}, pv, { payment_lines, journal_lines, payee_name, coa_name }));
+      // Compute aggregated amount from payment lines
+      let amount_to_pay = 0;
+      try {
+        if (payment_lines && payment_lines.length > 0) {
+          amount_to_pay = payment_lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
+        }
+      } catch (e) {
+        amount_to_pay = 0;
+      }
+
+  out.push(Object.assign({}, pv, { payment_lines, journal_lines, payee_name, coa_name, amount_to_pay }));
     }
     res.json(out);
   } catch (err) {
@@ -90,7 +103,7 @@ router.post('/', async (req, res) => {
   const db = getDbPool(req);
   const conn = await db.getConnection();
   try {
-    const { status, preparation_date, purpose, paid_through, prepared_by, payee, description, amount_to_pay, coa_id, payment_lines, journal_lines } = req.body;
+  const { status, preparation_date, purpose, paid_through, prepared_by, payment_lines, journal_lines } = req.body;
     let lastErr = null;
     // Retry loop to handle rare duplicate control collisions
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -98,8 +111,8 @@ router.post('/', async (req, res) => {
         await conn.beginTransaction();
         const [countRows] = await conn.execute('SELECT COUNT(*) as count FROM payment_vouchers');
         const control = 'PV-' + (countRows[0].count + 1);
-        const params = [control, status, preparation_date, purpose, paid_through, prepared_by, payee, description, amount_to_pay, coerceNumberOrNull(coa_id)].map(v => v === undefined ? null : v);
-        const [r] = await conn.execute('INSERT INTO payment_vouchers (payment_voucher_control, status, preparation_date, purpose, paid_through, prepared_by, payee, description, amount_to_pay, coa_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', params);
+  const params = [control, status, preparation_date, purpose, paid_through, prepared_by].map(v => v === undefined ? null : v);
+  const [r] = await conn.execute('INSERT INTO payment_vouchers (payment_voucher_control, status, preparation_date, purpose, paid_through, prepared_by) VALUES (?, ?, ?, ?, ?, ?)', params);
         const id = r.insertId;
         if (Array.isArray(payment_lines)) {
           for (const pl of payment_lines) {
@@ -146,8 +159,8 @@ router.put('/:id', async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const { status, preparation_date, purpose, paid_through, prepared_by, payee, description, amount_to_pay, coa_id, payment_lines, journal_lines } = req.body;
-    await conn.execute('UPDATE payment_vouchers SET status=?, preparation_date=?, purpose=?, paid_through=?, prepared_by=?, payee=?, description=?, amount_to_pay=?, coa_id=? WHERE payment_voucher_id=?', [status, preparation_date, purpose, paid_through, prepared_by, payee, description, amount_to_pay, coerceNumberOrNull(coa_id), id]);
+  const { status, preparation_date, purpose, paid_through, prepared_by, payment_lines, journal_lines } = req.body;
+  await conn.execute('UPDATE payment_vouchers SET status=?, preparation_date=?, purpose=?, paid_through=?, prepared_by=? WHERE payment_voucher_id=?', [status, preparation_date, purpose, paid_through, prepared_by, id]);
     await conn.execute('DELETE FROM payment_voucher_payment_lines WHERE payment_voucher_id=?', [id]);
     if (Array.isArray(payment_lines)) {
       for (const pl of payment_lines) {
@@ -191,8 +204,6 @@ router.delete('/:id', async (req, res) => {
     conn.release();
   }
 });
-
-module.exports = router;
 
 // PDF endpoint: render a payment voucher as PDF
 router.get('/:id/pdf', async (req, res) => {
@@ -298,3 +309,5 @@ function escapeHtml(s) {
   if (!s && s !== 0) return '';
   return String(s).replace(/[&<>\"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]; });
 }
+
+module.exports = router;
