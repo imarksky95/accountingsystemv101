@@ -15,7 +15,16 @@ router.post('/register', async (req, res) => {
     const sql = 'INSERT INTO users (username, password_hash, role_id, full_name, email, mobile) VALUES (?, ?, ?, ?, ?, ?)';
     const dbPool = req.app.get('dbPool');
 
-    const [result] = await dbPool.execute(sql, [username, hashedPassword, role_id, full_name || null, email || null, mobile || null]);
+    let result;
+    try {
+      [result] = await dbPool.execute(sql, [username, hashedPassword, role_id, full_name || null, email || null, mobile || null]);
+    } catch (dbErr) {
+      // Handle duplicate username (unique constraint)
+      if (dbErr && dbErr.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({ error: 'Username already exists', message: 'Username already exists' });
+      }
+      throw dbErr;
+    }
     const insertId = result && result.insertId ? result.insertId : null;
     if (!insertId) return res.status(500).json({ message: 'Failed to create user' });
 

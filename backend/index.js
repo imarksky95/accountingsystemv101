@@ -209,7 +209,7 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
         if (!actorRoleId || Number(actorRoleId) !== 1) {
           return res.status(403).json({ error: 'Forbidden: requires admin role' });
         }
-        const [rows] = await dbPool.execute('SELECT user_id, username, role_id, created_at FROM users');
+  const [rows] = await dbPool.execute('SELECT user_id, username, role_id, full_name, email, mobile, created_at FROM users');
         res.json(Array.isArray(rows) ? rows : []);
       } catch (err) {
         next(err);
@@ -240,7 +240,15 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
 
             const sql = `UPDATE users SET ${fields.join(', ')} WHERE user_id = ?`;
             params.push(userId);
-            const [result] = await dbPool.execute(sql, params);
+            let result;
+            try {
+              [result] = await dbPool.execute(sql, params);
+            } catch (dbErr) {
+              if (dbErr && dbErr.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({ error: 'Username already exists' });
+              }
+              throw dbErr;
+            }
             if (result && result.affectedRows === 0) return res.status(404).json({ error: 'User not found' });
 
             const [rows] = await dbPool.execute('SELECT user_id, username, role_id, full_name, email, mobile, created_at FROM users WHERE user_id = ?', [userId]);
@@ -311,6 +319,24 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
         newRole.reviewer = normalizeList(newRole.reviewer);
         newRole.approver = normalizeList(newRole.approver);
         res.status(201).json(newRole);
+      } catch (err) {
+        next(err);
+      }
+    });
+
+    // Get single user details (protected; only Super Admin role_id === 1)
+    app.get('/api/users/:user_id', authenticateToken, async (req, res, next) => {
+      try {
+        const actorRoleId = req.user && req.user.role_id;
+        if (!actorRoleId || Number(actorRoleId) !== 1) {
+          return res.status(403).json({ error: 'Forbidden: requires admin role' });
+        }
+        const userId = parseInt(req.params.user_id, 10);
+        if (Number.isNaN(userId)) return res.status(400).json({ error: 'Invalid user_id' });
+
+        const [rows] = await dbPool.execute('SELECT user_id, username, role_id, full_name, email, mobile, created_at FROM users WHERE user_id = ?', [userId]);
+        if (!rows || rows.length === 0) return res.status(404).json({ error: 'User not found' });
+        res.json(rows[0]);
       } catch (err) {
         next(err);
       }

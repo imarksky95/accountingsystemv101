@@ -90,11 +90,33 @@ export default function UsersAndRoleSettings() {
   const [editUserRoleId, setEditUserRoleId] = useState<any>('');
 
   function openUserEditor(u: any) {
-    setEditingUser(u);
-    setEditUserFullName(u.full_name || '');
-    setEditUserEmail(u.email || '');
-    setEditUserMobile(u.mobile || '');
-    setEditUserRoleId(u.role_id || '');
+    // fetch latest from server in case the users array is stale
+    (async () => {
+      try {
+        const res = await tryFetchWithFallback(`/api/users/${u.user_id}`, { cache: 'no-store', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
+        if (res.ok) {
+          const fresh = await res.json();
+          setEditingUser(fresh);
+          setEditUserFullName(fresh.full_name || '');
+          setEditUserEmail(fresh.email || '');
+          setEditUserMobile(fresh.mobile || '');
+          setEditUserRoleId(fresh.role_id || '');
+        } else {
+          // fallback to existing object
+          setEditingUser(u);
+          setEditUserFullName(u.full_name || '');
+          setEditUserEmail(u.email || '');
+          setEditUserMobile(u.mobile || '');
+          setEditUserRoleId(u.role_id || '');
+        }
+      } catch (e) {
+        setEditingUser(u);
+        setEditUserFullName(u.full_name || '');
+        setEditUserEmail(u.email || '');
+        setEditUserMobile(u.mobile || '');
+        setEditUserRoleId(u.role_id || '');
+      }
+    })();
   }
 
   async function save() {
@@ -200,10 +222,25 @@ export default function UsersAndRoleSettings() {
               return;
             }
             try {
+                // validation: email format
+                if (newUserEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(newUserEmail)) {
+                  setSnack({ open: true, message: 'Invalid email format', severity: 'error' });
+                  return;
+                }
+                // normalize mobile: keep digits only, allow leading '+'
+                const normalizeMobile = (m: string) => {
+                  if (!m) return '';
+                  // keep leading + if present, then digits
+                  const plus = m.trim().startsWith('+') ? '+' : '';
+                  const digits = m.replace(/[^0-9]/g, '');
+                  return plus + digits;
+                };
+                const normalizedMobile = normalizeMobile(newUserMobile);
+
                 const payload: any = { username: newUser.username, password: newUser.password, role_id: Number(newUser.role_id) };
                 if (newUserFullName) payload.full_name = newUserFullName;
                 if (newUserEmail) payload.email = newUserEmail;
-                if (newUserMobile) payload.mobile = newUserMobile;
+                if (normalizedMobile) payload.mobile = normalizedMobile;
                 const url = buildUrl('/api/auth/register');
                 const token = localStorage.getItem('token') || '';
                 const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
@@ -378,7 +415,20 @@ export default function UsersAndRoleSettings() {
           <Button variant="contained" onClick={async () => {
             if (!editingUser) return;
             try {
-              const payload: any = { full_name: editUserFullName, email: editUserEmail, mobile: editUserMobile, role_id: Number(editUserRoleId) };
+              // email validation
+              if (editUserEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(editUserEmail)) {
+                setSnack({ open: true, message: 'Invalid email format', severity: 'error' });
+                return;
+              }
+              const normalizeMobile = (m: string) => {
+                if (!m) return '';
+                const plus = m.trim().startsWith('+') ? '+' : '';
+                const digits = m.replace(/[^0-9]/g, '');
+                return plus + digits;
+              };
+              const normalizedMobile = normalizeMobile(editUserMobile);
+
+              const payload: any = { full_name: editUserFullName, email: editUserEmail, mobile: normalizedMobile, role_id: Number(editUserRoleId) };
               const token = localStorage.getItem('token') || '';
               const res = await fetch(buildUrl(`/api/users/${editingUser.user_id}`), { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
               if (!res.ok) {
