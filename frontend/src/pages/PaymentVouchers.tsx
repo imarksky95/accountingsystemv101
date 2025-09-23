@@ -11,7 +11,7 @@ interface PaymentLine { payee_id?: string | number; payee_contact_id?: number | 
 interface JournalLine { coa_id?: string | number | null; debit?: number | string; credit?: number | string; remarks?: string }
 interface PVForm {
   status?: string;
-  preparation_date?: string;
+  preparation_date?: string | null;
   purpose?: string;
   paid_through?: string;
   prepared_by?: number | string | null;
@@ -298,14 +298,15 @@ const PaymentVouchers: React.FC = () => {
     } catch (e) {}
     setOpen(true);
   };
-  interface PVItem { payment_voucher_id?: number; payment_voucher_control?: string; payment_lines?: PaymentLine[]; journal_lines?: JournalLine[]; reviewed_by?: number | string; reviewed_by_manual?: string; approved_by?: number | string; approved_by_manual?: string; prepared_by?: number | string }
+  interface PVItem { payment_voucher_id?: number; payment_voucher_control?: string; payment_lines?: PaymentLine[]; journal_lines?: JournalLine[]; reviewed_by?: number | string; reviewed_by_manual?: string; approved_by?: number | string; approved_by_manual?: string; prepared_by?: number | string; preparation_date?: string | null }
   const openEdit = async (pv: PVItem) => {
     await Promise.all([fetchContacts(), fetchCoas()]);
     setEditing(pv);
     setExpectedControl(pv.payment_voucher_control || '');
     setForm({
       ...pv,
-      payment_lines: pv.payment_lines && pv.payment_lines.length ? pv.payment_lines : [{ payee_id: '', description: '', amount: 0 }],
+      preparation_date: pv.preparation_date && typeof pv.preparation_date === 'string' && pv.preparation_date.indexOf('T') !== -1 ? pv.preparation_date.slice(0,10) : pv.preparation_date,
+      payment_lines: pv.payment_lines && pv.payment_lines.length ? pv.payment_lines.map((pl:any) => ({ payee_id: pl.payee_contact_id ? String(pl.payee_contact_id) : (pl.payee_id || ''), payee_name: pl.payee_display || pl.payee_name || '', description: pl.description || '', amount: pl.amount || 0 })) : [{ payee_id: '', description: '', amount: 0 }],
       journal_lines: pv.journal_lines && pv.journal_lines.length ? pv.journal_lines : [{ coa_id: '', debit: 0, credit: 0, remarks: '' }],
       reviewed_by: pv.reviewed_by || pv.reviewed_by_manual || '',
       approved_by: pv.approved_by || pv.approved_by_manual || ''
