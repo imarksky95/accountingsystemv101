@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useCompany } from '../CompanyContext';
 import { Box, Typography, Paper, Divider, TextField, Button, MenuItem, Avatar } from '@mui/material';
 import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
+import UsersAndRoleSettings from './UsersAndRoleSettings';
 
 const companyTypes = [
   'Freelancer',
@@ -178,8 +179,7 @@ const Settings: React.FC = () => {
       </Paper>
       <Divider />
       <Paper sx={{ p: 2, mb: 2, mt: 2 }}>
-        <Typography variant="h6">Users and Role Settings</Typography>
-        <Typography color="textSecondary">Define organization users, roles, reviewers and approvers here.</Typography>
+        <UsersAndRoleSettings />
       </Paper>
     </Box>
   );
