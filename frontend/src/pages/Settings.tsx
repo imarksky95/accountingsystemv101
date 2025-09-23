@@ -191,8 +191,8 @@ const Settings: React.FC = () => {
       </Paper>
       <Divider />
       <Paper sx={{ p: 2, mb: 2, mt: 2 }}>
-        <Typography variant="h6">User Settings</Typography>
-        <Typography color="textSecondary">User settings will be managed here.</Typography>
+        <Typography variant="h6">Users and Role Settings</Typography>
+        <Typography color="textSecondary">Define organization users, roles, reviewers and approvers here.</Typography>
       </Paper>
     </Box>
   );
