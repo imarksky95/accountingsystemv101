@@ -77,6 +77,9 @@ router.post('/login', async (req, res) => {
         user_id: user.user_id,
         username: user.username,
         role_id: user.role_id,
+        full_name: user.full_name || null,
+        email: user.email || null,
+        mobile: user.mobile || null,
       },
     });
   } catch (err) {
@@ -103,7 +106,7 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     const dbPool = req.app.get('dbPool');
     const [rows] = await dbPool.execute(
-      'SELECT user_id, username, role_id FROM users WHERE user_id = ?',
+      'SELECT user_id, username, role_id, full_name, email, mobile FROM users WHERE user_id = ?',
       [req.user.user_id]
     );
     res.json(rows[0]);
