@@ -63,6 +63,10 @@ export default function UsersAndRoleSettings() {
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity?: 'success' | 'error' | 'info' }>({ open: false, message: '' });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any | null>(null);
+  const [showDeleteRoleConfirm, setShowDeleteRoleConfirm] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState<any | null>(null);
+  const [showRoleDeleteBlocked, setShowRoleDeleteBlocked] = useState(false);
+  const [roleDeleteBlockedUsers, setRoleDeleteBlockedUsers] = useState<any[]>([]);
 
   useEffect(() => {
     async function fetchUsers() {
@@ -216,11 +220,29 @@ export default function UsersAndRoleSettings() {
 
                   <List dense disablePadding>
                     {roles.map(r => (
-                      <ListItem key={r.role_id} secondaryAction={<Button size="small" onClick={() => openEditor(r)}>Edit</Button>} sx={{ py: 0.5 }}>
+                      <ListItem key={r.role_id} sx={{ py: 0.5 }}>
                         <ListItemText
                           primary={r.role_name}
                           secondary={<><strong>Type:</strong> {(r.role_type || 'none').toString()}</>}
                         />
+                        <Box>
+                          {user && Number(user.role_id) === 1 && (
+                            <>
+                              <Button size="small" onClick={() => openEditor(r)}>Edit</Button>
+                              <Button size="small" color="error" sx={{ ml: 1 }} onClick={() => {
+                                const assigned = Array.isArray(users) ? users.filter(u => Number(u.role_id) === Number(r.role_id)) : [];
+                                if (assigned.length > 0) {
+                                  setRoleToDelete(r);
+                                  setRoleDeleteBlockedUsers(assigned);
+                                  setShowRoleDeleteBlocked(true);
+                                } else {
+                                  setRoleToDelete(r);
+                                  setShowDeleteRoleConfirm(true);
+                                }
+                              }}>Delete</Button>
+                            </>
+                          )}
+                        </Box>
                       </ListItem>
                     ))}
                   </List>
@@ -482,6 +504,53 @@ export default function UsersAndRoleSettings() {
               setSnack({ open: true, message: 'Failed to delete user', severity: 'error' });
             }
           }} color="error">Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={showDeleteRoleConfirm} onClose={() => { setShowDeleteRoleConfirm(false); setRoleToDelete(null); }}>
+        <DialogTitle>Delete Role</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete the role <strong>{roleToDelete ? roleToDelete.role_name : ''}</strong>? This may fail if users are assigned to this role.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setShowDeleteRoleConfirm(false); setRoleToDelete(null); }}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={async () => {
+            if (!roleToDelete) return;
+            try {
+              const token = localStorage.getItem('token') || '';
+              const res = await fetch(buildUrl(`/api/roles/${roleToDelete.role_id}`), { method: 'DELETE', headers: { Authorization: token ? `Bearer ${token}` : '' } });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                setSnack({ open: true, message: err.error || 'Failed to delete role', severity: 'error' });
+                return;
+              }
+              setSnack({ open: true, message: 'Role deleted', severity: 'success' });
+              setShowDeleteRoleConfirm(false);
+              setRoleToDelete(null);
+              try { await fetchRoles(); } catch (e) { /* ignore */ }
+            } catch (e) {
+              setSnack({ open: true, message: 'Failed to delete role', severity: 'error' });
+            }
+          }}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={showRoleDeleteBlocked} onClose={() => { setShowRoleDeleteBlocked(false); setRoleDeleteBlockedUsers([]); setRoleToDelete(null); }} fullWidth maxWidth="sm">
+        <DialogTitle>Cannot Delete Role</DialogTitle>
+        <DialogContent>
+          <Typography>This role has users assigned. Re-assign those users to a different role before deleting.</Typography>
+          <Box mt={2}>
+            {roleDeleteBlockedUsers.map(u => (
+              <Box key={u.user_id} display="flex" justifyContent="space-between" sx={{ py: 0.5 }}>
+                <Typography>{u.username}</Typography>
+                <Typography color="textSecondary">{(roles.find(r => Number(r.role_id) === Number(u.role_id)) || {}).role_name || `ID ${u.role_id}`}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setShowRoleDeleteBlocked(false); setRoleDeleteBlockedUsers([]); setRoleToDelete(null); }}>Close</Button>
+          <Button variant="contained" onClick={() => { setShowRoleDeleteBlocked(false); setRoleDeleteBlockedUsers([]); setTabIndex(0); }}>Go to Users</Button>
         </DialogActions>
       </Dialog>
 

@@ -281,6 +281,32 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
+// Delete role (protected; only Super Admin role_id === 1)
+app.delete('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
+  try {
+    const actorRoleId = req.user && req.user.role_id;
+    if (!actorRoleId || Number(actorRoleId) !== 1) {
+      return res.status(403).json({ error: 'Forbidden: requires admin role' });
+    }
+    const roleId = parseInt(req.params.role_id, 10);
+    if (Number.isNaN(roleId)) return res.status(400).json({ error: 'Invalid role_id' });
+
+    try {
+      const [result] = await dbPool.execute('DELETE FROM roles WHERE role_id = ?', [roleId]);
+      if (result && result.affectedRows === 0) return res.status(404).json({ error: 'Role not found' });
+      res.json({ success: true });
+    } catch (dbErr) {
+      // Foreign key or integrity constraint - likely users reference this role
+      if (dbErr && dbErr.code === 'ER_ROW_IS_REFERENCED_' || (dbErr && dbErr.errno === 1451)) {
+        return res.status(409).json({ error: 'Role is in use and cannot be deleted' });
+      }
+      throw dbErr;
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Test endpoint for connectivity
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend is working!' });
