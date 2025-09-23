@@ -33,6 +33,7 @@ const PaymentVouchers: React.FC = () => {
   const [expectedControl, setExpectedControl] = useState<string>('');
   const firstFocusRef = useRef<HTMLInputElement | null>(null);
   const [companyProfile, setCompanyProfile] = useState<any>(null);
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<any | null>(null);
 
@@ -179,14 +180,45 @@ const PaymentVouchers: React.FC = () => {
       setExpectedControl('');
     }
     setEditing(null);
+    // derive signatories from current user's workflow settings (prefer id then manual)
+    let reviewed_by_val: any = '';
+    let approved_by_val: any = '';
+    try {
+      const me = user as any;
+      if (me) {
+        if (me.reviewer_id) reviewed_by_val = me.reviewer_id;
+        else if (me.reviewer_manual) reviewed_by_val = me.reviewer_manual;
+        if (me.approver_id) approved_by_val = me.approver_id;
+        else if (me.approver_manual) approved_by_val = me.approver_manual;
+      }
+    } catch (e) {}
+
     setForm({
       ...emptyForm,
       preparation_date: new Date().toISOString().slice(0,10),
       prepared_by: user?.user_id || null,
+      reviewed_by: reviewed_by_val,
+      approved_by: approved_by_val,
       // ensure at least one payment_line and one journal_line so selects render options
       payment_lines: [{ payee_id: '', description: '', amount: 0 }],
       journal_lines: [{ coa_id: '', debit: 0, credit: 0, remarks: '' }]
     });
+    // If reviewed_by/approved_by are numeric IDs, resolve their full_name for display
+    try {
+      const token = localStorage.getItem('token');
+      if (reviewed_by_val && !isNaN(Number(reviewed_by_val))) {
+        const id = String(reviewed_by_val);
+        axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+          .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id })); })
+          .catch(() => {});
+      }
+      if (approved_by_val && !isNaN(Number(approved_by_val))) {
+        const id2 = String(approved_by_val);
+        axios.get(buildUrl(`/api/users/${id2}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+          .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [id2]: r.data.full_name || r.data.username || id2 })); })
+          .catch(() => {});
+      }
+    } catch (e) {}
     setOpen(true);
   };
   const openEdit = async (pv: any) => {
@@ -196,9 +228,25 @@ const PaymentVouchers: React.FC = () => {
     setForm({
       ...pv,
       payment_lines: pv.payment_lines && pv.payment_lines.length ? pv.payment_lines : [{ payee_id: '', description: '', amount: 0 }],
-      journal_lines: pv.journal_lines && pv.journal_lines.length ? pv.journal_lines : [{ coa_id: '', debit: 0, credit: 0, remarks: '' }]
+      journal_lines: pv.journal_lines && pv.journal_lines.length ? pv.journal_lines : [{ coa_id: '', debit: 0, credit: 0, remarks: '' }],
+      reviewed_by: pv.reviewed_by || pv.reviewed_by_manual || '',
+      approved_by: pv.approved_by || pv.approved_by_manual || ''
     });
     setOpen(true);
+    // Resolve reviewer/approver IDs to full_name for display
+    try {
+      const token = localStorage.getItem('token');
+      const idsToResolve: string[] = [];
+      const rid = pv.reviewed_by || pv.reviewed_by_manual || '';
+      const aid = pv.approved_by || pv.approved_by_manual || '';
+      if (rid && !isNaN(Number(rid))) idsToResolve.push(String(rid));
+      if (aid && !isNaN(Number(aid))) idsToResolve.push(String(aid));
+      for (const id of idsToResolve) {
+        axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+          .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id })); })
+          .catch(() => {});
+      }
+    } catch (e) {}
   };
 
   // Prefetch data on mount for the overview and dialog selects
@@ -473,10 +521,18 @@ const PaymentVouchers: React.FC = () => {
           <Box sx={{mt:2, mb:2}}>
             <Box sx={{fontWeight:700, mb:1}}>SIGNATORIES</Box>
             <Box sx={{display:'grid', gridTemplateColumns: '1fr 1fr 1fr', gap:2}}>
-              <TextField label="Prepared By" value={user?.username || ''} disabled />
-              <TextField label="Reviewed By" value={form.reviewed_by || ''} onChange={e => setForm({...form, reviewed_by: e.target.value})} />
-              <TextField label="Approved By" value={form.approved_by || ''} onChange={e => setForm({...form, approved_by: e.target.value})} />
-            </Box>
+                <TextField label="Prepared By" value={user?.username || ''} disabled />
+                <TextField label="Reviewed By" value={(():any => {
+                  const v = form.reviewed_by;
+                  if (v && !isNaN(Number(v))) return userNames[String(v)] || String(v);
+                  return v || '';
+                })()} onChange={e => setForm({...form, reviewed_by: e.target.value})} />
+                <TextField label="Approved By" value={(():any => {
+                  const v = form.approved_by;
+                  if (v && !isNaN(Number(v))) return userNames[String(v)] || String(v);
+                  return v || '';
+                })()} onChange={e => setForm({...form, approved_by: e.target.value})} />
+              </Box>
           </Box>
         </DialogContent>
         <DialogActions>
