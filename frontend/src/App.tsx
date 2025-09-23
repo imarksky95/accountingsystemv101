@@ -13,6 +13,7 @@ import Contacts from './pages/Contacts';
 import ChartOfAccounts from './pages/ChartOfAccounts';
 import Payroll from './pages/Payroll';
 import Settings from './pages/Settings';
+import UsersAndRoleSettings from './pages/UsersAndRoleSettings';
 
 const Dashboard = () => {
   const { user } = useContext(UserContext);
@@ -107,6 +108,16 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <Settings />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/roles-settings"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <UsersAndRoleSettings />
               </DashboardLayout>
             </ProtectedRoute>
           }
