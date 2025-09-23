@@ -92,37 +92,8 @@ app.use('/api/debug', debugRoutes);
 app.get('/api/roles', async (req, res, next) => {
   try {
     const [rows] = await dbPool.execute('SELECT * FROM roles');
-    // Normalize reviewer/approver columns to arrays for frontend convenience
-    const normalizeList = (val) => {
-      if (val == null) return [];
-      if (Array.isArray(val)) return val;
-      if (typeof val === 'object') return val;
-      // Try JSON parse first (e.g. stored as '[1,2]')
-      if (typeof val === 'string') {
-        const s = val.trim();
-        if (s.length === 0) return [];
-        try {
-          const parsed = JSON.parse(s);
-          if (Array.isArray(parsed)) return parsed;
-        } catch (e) {
-          // fallthrough to CSV parse
-        }
-        // Fallback: comma-separated values
-        return s.split(',').map(x => {
-          const t = x.trim();
-          if (/^\d+$/.test(t)) return Number(t);
-          return t;
-        }).filter(x => x !== '');
-      }
-      return [];
-    };
-
-    const normalized = rows.map(r => {
-      return Object.assign({}, r, {
-        reviewer: normalizeList(r.reviewer),
-        approver: normalizeList(r.approver)
-      });
-    });
+    // Return rows as-is but ensure role_type is present
+    const normalized = rows.map(r => Object.assign({}, r, { role_type: r.role_type || 'none' }));
     res.json(normalized);
   } catch (err) {
     next(err);
@@ -143,25 +114,13 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
     const roleId = parseInt(req.params.role_id, 10);
     if (Number.isNaN(roleId)) return res.status(400).json({ error: 'Invalid role_id' });
 
-    const { reviewer, approver } = req.body || {};
 
-    const prepareValue = (v) => {
-      if (v == null) return null;
-      if (Array.isArray(v)) return JSON.stringify(v);
-      if (typeof v === 'string') return v;
-      // for objects, stringify
-      try {
-        return JSON.stringify(v);
-      } catch (e) {
-        return String(v);
-      }
-    };
+    const { role_type } = req.body || {};
+    const allowed = ['none','reviewer','approver','both'];
+    const rt = allowed.includes(role_type) ? role_type : 'none';
 
-    const reviewerVal = prepareValue(reviewer);
-    const approverVal = prepareValue(approver);
-
-    const sql = 'UPDATE roles SET reviewer = ?, approver = ? WHERE role_id = ?';
-    const [result] = await dbPool.execute(sql, [reviewerVal, approverVal, roleId]);
+    const sql = 'UPDATE roles SET role_type = ? WHERE role_id = ?';
+    const [result] = await dbPool.execute(sql, [rt, roleId]);
 
     if (result && result.affectedRows === 0) {
       return res.status(404).json({ error: 'Role not found' });
@@ -172,30 +131,8 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
     if (!rows || rows.length === 0) return res.status(404).json({ error: 'Role not found after update' });
     const updated = rows[0];
     // normalize before returning
-    const normalizeList = (val) => {
-      if (val == null) return [];
-      if (Array.isArray(val)) return val;
-      if (typeof val === 'string') {
-        const s = val.trim();
-        if (s.length === 0) return [];
-        try {
-          const parsed = JSON.parse(s);
-          if (Array.isArray(parsed)) return parsed;
-        } catch (e) {
-          // fallback to CSV
-        }
-        return s.split(',').map(x => {
-          const t = x.trim();
-          if (/^\d+$/.test(t)) return Number(t);
-          return t;
-        }).filter(x => x !== '');
-      }
-      return [];
-    };
-
-    updated.reviewer = normalizeList(updated.reviewer);
-    updated.approver = normalizeList(updated.approver);
-
+    // Ensure role_type is included in response
+    updated.role_type = updated.role_type || 'none';
     res.json(updated);
   } catch (err) {
     next(err);
@@ -265,34 +202,13 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
         if (!actorRoleId || Number(actorRoleId) !== 1) {
           return res.status(403).json({ error: 'Forbidden: requires admin role' });
         }
-            const { role_name, reviewer, approver } = req.body || {};
+            const { role_name, role_type } = req.body || {};
             if (!role_name || String(role_name).trim().length === 0) return res.status(400).json({ error: 'Missing role_name' });
+            const allowed = ['none','reviewer','approver','both'];
+            const rt = allowed.includes(role_type) ? role_type : 'none';
 
-            // Prepare reviewer/approver values for storage. Accept arrays or comma-separated strings.
-            const prepareValueForInsert = (v) => {
-              if (v == null) return null;
-              if (Array.isArray(v)) return JSON.stringify(v);
-              if (typeof v === 'string') {
-                const s = v.trim();
-                if (s.length === 0) return null;
-                // if it looks like JSON array, keep it
-                try {
-                  const parsed = JSON.parse(s);
-                  if (Array.isArray(parsed)) return JSON.stringify(parsed);
-                } catch (e) {
-                  // not JSON
-                }
-                // store comma-separated string as-is
-                return s;
-              }
-              try { return JSON.stringify(v); } catch (e) { return String(v); }
-            };
-
-            const reviewerVal = prepareValueForInsert(reviewer);
-            const approverVal = prepareValueForInsert(approver);
-
-            const sql = 'INSERT INTO roles (role_name, reviewer, approver) VALUES (?, ?, ?)';
-            const [result] = await dbPool.execute(sql, [String(role_name).trim(), reviewerVal, approverVal]);
+            const sql = 'INSERT INTO roles (role_name, role_type) VALUES (?, ?)';
+            const [result] = await dbPool.execute(sql, [String(role_name).trim(), rt]);
         const insertId = result && result.insertId ? result.insertId : null;
         if (!insertId) return res.status(500).json({ error: 'Failed to create role' });
 
@@ -316,8 +232,7 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
           return [];
         };
 
-        newRole.reviewer = normalizeList(newRole.reviewer);
-        newRole.approver = normalizeList(newRole.approver);
+        newRole.role_type = newRole.role_type || 'none';
         res.status(201).json(newRole);
       } catch (err) {
         next(err);
