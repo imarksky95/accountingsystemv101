@@ -6,17 +6,23 @@ const router = express.Router();
 // Register
 router.post('/register', async (req, res) => {
   console.log('Received POST /register', req.method, req.body);
-  const { username, password, role_id } = req.body;
+  const { username, password, role_id, full_name, email, mobile } = req.body;
   if (!username || !password || !role_id) {
     return res.status(400).json({ message: 'Missing fields' });
   }
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const sql = 'INSERT INTO users (username, password_hash, role_id) VALUES (?, ?, ?)';
+    const sql = 'INSERT INTO users (username, password_hash, role_id, full_name, email, mobile) VALUES (?, ?, ?, ?, ?, ?)';
     const dbPool = req.app.get('dbPool');
 
-    await dbPool.execute(sql, [username, hashedPassword, role_id]);
-    res.status(201).json({ message: 'User registered successfully' });
+    const [result] = await dbPool.execute(sql, [username, hashedPassword, role_id, full_name || null, email || null, mobile || null]);
+    const insertId = result && result.insertId ? result.insertId : null;
+    if (!insertId) return res.status(500).json({ message: 'Failed to create user' });
+
+    // Return created user summary
+    const [rows] = await dbPool.execute('SELECT user_id, username, role_id, full_name, email, mobile, created_at FROM users WHERE user_id = ?', [insertId]);
+    const user = rows && rows[0] ? rows[0] : null;
+    res.status(201).json({ message: 'User registered successfully', user });
   } catch (err) {
     console.error('DB error during registration:', err);
     res.status(500).json({ message: 'Server error' });

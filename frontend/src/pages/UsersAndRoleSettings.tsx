@@ -44,6 +44,9 @@ export default function UsersAndRoleSettings() {
   const [users, setUsers] = useState<any[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUser, setNewUser] = useState({ username: '', password: '', role_id: '' });
+  const [newUserFullName, setNewUserFullName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserMobile, setNewUserMobile] = useState('');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [selReviewer, setSelReviewer] = useState<any[]>([]);
@@ -159,8 +162,11 @@ export default function UsersAndRoleSettings() {
         <DialogTitle>Add User</DialogTitle>
         <DialogContent>
           <Box mt={1} display="flex" flexDirection="column" gap={2}>
+            <TextField label="Full name" value={newUserFullName} onChange={(e) => setNewUserFullName(e.target.value)} fullWidth />
             <TextField label="Username" value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} fullWidth />
             <TextField label="Password" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} fullWidth />
+            <TextField label="Email" type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} fullWidth />
+            <TextField label="Mobile" value={newUserMobile} onChange={(e) => setNewUserMobile(e.target.value)} fullWidth />
             <Autocomplete
               options={roles}
               getOptionLabel={(opt:any) => opt.role_name || String(opt.role_id)}
@@ -179,16 +185,21 @@ export default function UsersAndRoleSettings() {
               return;
             }
             try {
-              const payload = { username: newUser.username, password: newUser.password, role_id: Number(newUser.role_id) };
-              const url = buildUrl('/api/auth/register');
-              const token = localStorage.getItem('token') || '';
-              const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
+                const payload: any = { username: newUser.username, password: newUser.password, role_id: Number(newUser.role_id) };
+                if (newUserFullName) payload.full_name = newUserFullName;
+                if (newUserEmail) payload.email = newUserEmail;
+                if (newUserMobile) payload.mobile = newUserMobile;
+                const url = buildUrl('/api/auth/register');
+                const token = localStorage.getItem('token') || '';
+                const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
               if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 setSnack({ open: true, message: err.message || 'Failed to add user', severity: 'error' });
                 return;
               }
-              setSnack({ open: true, message: 'User added', severity: 'success' });
+                // use server response to update users list if provided
+                const data = await res.json().catch(() => null);
+                setSnack({ open: true, message: 'User added', severity: 'success' });
               setShowAddUser(false);
               // Refresh users
               try {
