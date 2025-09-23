@@ -167,8 +167,7 @@ export default function UsersAndRoleSettings() {
 
               {tabIndex === 0 && (
                 <>
-                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                    <Typography variant="h6">Users</Typography>
+                  <Box display="flex" justifyContent="flex-end" alignItems="center" mb={1}>
                     <Box>
                       {user && Number(user.role_id) === 1 && (
                         <>
@@ -215,9 +214,6 @@ export default function UsersAndRoleSettings() {
 
               {tabIndex === 1 && (
                 <>
-                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                    <Typography variant="h6">Roles</Typography>
-                  </Box>
                   <List dense disablePadding>
                     {roles.map(r => (
                       <ListItem key={r.role_id} secondaryAction={<Button size="small" onClick={() => openEditor(r)}>Edit</Button>} sx={{ py: 0.5 }}>
