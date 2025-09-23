@@ -70,8 +70,16 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       >
         <Toolbar />
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 2 }}>
-          <Avatar sx={{ width: 64, height: 64, mb: 1 }}>{user?.username ? user.username[0].toUpperCase() : 'U'}</Avatar>
-          {!collapsed && <Typography variant="subtitle1">{user?.username || 'User'}</Typography>}
+                {(() => {
+                  const displayName = (user && (user.full_name || user.username)) || 'User';
+                  const initial = displayName ? displayName.trim()[0].toUpperCase() : 'U';
+                  return (
+                    <>
+                      <Avatar sx={{ width: 64, height: 64, mb: 1 }}>{initial}</Avatar>
+                      {!collapsed && <Typography variant="subtitle1">{displayName}</Typography>}
+                    </>
+                  );
+                })()}
           {!collapsed && (
             <ListItemButton sx={{ mt: 2, color: 'red' }} onClick={handleLogout}>
               <ListItemText primary="Logout" />
