@@ -202,6 +202,8 @@ export default Settings;
 function AccountEditor({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [, setLoading] = React.useState(false);
   const [values, setValues] = React.useState<any>({ full_name: '', email: '', mobile: '', reviewer_id: '', approver_id: '', reviewer_manual: '', approver_manual: '' });
+  const [reviewerManualMode, setReviewerManualMode] = React.useState(false);
+  const [approverManualMode, setApproverManualMode] = React.useState(false);
   const [reviewerOptions, setReviewerOptions] = React.useState<any[]>([]);
   const [approverOptions, setApproverOptions] = React.useState<any[]>([]);
 
@@ -214,6 +216,9 @@ function AccountEditor({ open, onClose }: { open: boolean; onClose: () => void }
         if (res.ok) {
           const data = await res.json();
           setValues(data || {});
+          // initialize manual-mode flags based on presence of manual name fields
+          setReviewerManualMode(!!(data && data.reviewer_manual));
+          setApproverManualMode(!!(data && data.approver_manual));
         }
         // load reviewer/approver lists filtered by role_type
         const rres = await fetch(buildUrl('/api/users/public?role_type=reviewer'));
@@ -235,25 +240,47 @@ function AccountEditor({ open, onClose }: { open: boolean; onClose: () => void }
           <TextField label="Email" value={values.email || ''} onChange={(e) => setValues((v:any) => ({ ...v, email: e.target.value }))} fullWidth />
           <TextField label="Mobile" value={values.mobile || ''} onChange={(e) => setValues((v:any) => ({ ...v, mobile: e.target.value }))} fullWidth />
 
-          <Autocomplete
-            options={reviewerOptions}
-            getOptionLabel={(opt:any) => opt.full_name || opt.username || ''}
-            value={reviewerOptions.find(r => Number(r.user_id) === Number(values.reviewer_id)) || null}
-            onChange={(e, val:any) => setValues((v:any) => ({ ...v, reviewer_id: val ? val.user_id : '' }))}
-            renderInput={(params) => <TextField {...params} label="Reviewer (select)" />}
-            freeSolo
-          />
-          <TextField label="Reviewer (manual name)" value={values.reviewer_manual || ''} onChange={(e) => setValues((v:any) => ({ ...v, reviewer_manual: e.target.value }))} fullWidth />
+          <Box display="flex" alignItems="center" gap={1}>
+            <input type="checkbox" id="reviewerManual" checked={reviewerManualMode} onChange={(e) => {
+              const manual = e.target.checked;
+              setReviewerManualMode(manual);
+              setValues((v:any) => ({ ...v, reviewer_manual: manual ? (v.reviewer_manual || '') : '' , reviewer_id: manual ? '' : v.reviewer_id }));
+            }} />
+            <label htmlFor="reviewerManual">Manual reviewer name</label>
+          </Box>
+          {reviewerManualMode ? (
+            <TextField label="Reviewer (manual name)" value={values.reviewer_manual || ''} onChange={(e) => setValues((v:any) => ({ ...v, reviewer_manual: e.target.value }))} fullWidth />
+          ) : (
+            <Autocomplete
+              options={reviewerOptions}
+              getOptionLabel={(opt:any) => opt.full_name || opt.username || ''}
+              value={reviewerOptions.find(r => Number(r.user_id) === Number(values.reviewer_id)) || null}
+              onChange={(e, val:any) => setValues((v:any) => ({ ...v, reviewer_id: val ? val.user_id : '' }))}
+              renderInput={(params) => <TextField {...params} label="Reviewer (select)" />}
+              freeSolo
+            />
+          )}
 
-          <Autocomplete
-            options={approverOptions}
-            getOptionLabel={(opt:any) => opt.full_name || opt.username || ''}
-            value={approverOptions.find(r => Number(r.user_id) === Number(values.approver_id)) || null}
-            onChange={(e, val:any) => setValues((v:any) => ({ ...v, approver_id: val ? val.user_id : '' }))}
-            renderInput={(params) => <TextField {...params} label="Approver (select)" />}
-            freeSolo
-          />
-          <TextField label="Approver (manual name)" value={values.approver_manual || ''} onChange={(e) => setValues((v:any) => ({ ...v, approver_manual: e.target.value }))} fullWidth />
+          <Box display="flex" alignItems="center" gap={1}>
+            <input type="checkbox" id="approverManual" checked={approverManualMode} onChange={(e) => {
+              const manual = e.target.checked;
+              setApproverManualMode(manual);
+              setValues((v:any) => ({ ...v, approver_manual: manual ? (v.approver_manual || '') : '' , approver_id: manual ? '' : v.approver_id }));
+            }} />
+            <label htmlFor="approverManual">Manual approver name</label>
+          </Box>
+          {approverManualMode ? (
+            <TextField label="Approver (manual name)" value={values.approver_manual || ''} onChange={(e) => setValues((v:any) => ({ ...v, approver_manual: e.target.value }))} fullWidth />
+          ) : (
+            <Autocomplete
+              options={approverOptions}
+              getOptionLabel={(opt:any) => opt.full_name || opt.username || ''}
+              value={approverOptions.find(r => Number(r.user_id) === Number(values.approver_id)) || null}
+              onChange={(e, val:any) => setValues((v:any) => ({ ...v, approver_id: val ? val.user_id : '' }))}
+              renderInput={(params) => <TextField {...params} label="Approver (select)" />}
+              freeSolo
+            />
+          )}
         </Box>
       </DialogContent>
       <DialogActions>
