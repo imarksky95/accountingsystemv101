@@ -46,6 +46,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
         });
+
+      // Also refresh stored user object with server data when available
+      getMe(token).then(res => {
+        try {
+          localStorage.setItem('user', JSON.stringify(res.data));
+        } catch (e) { /* ignore */ }
+      }).catch(() => {});
     }
   }, []);
 
