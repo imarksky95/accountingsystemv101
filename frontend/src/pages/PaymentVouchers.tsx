@@ -63,6 +63,17 @@ const PaymentVouchers: React.FC = () => {
         // keep pvResData as empty array
       }
       setItems(pvResData);
+      // Seed userNames cache from any prepared_by_username or numeric prepared_by in the fetched PVs
+      try {
+        const seed: Record<string,string> = {};
+        for (const p of pvResData) {
+          if (p.prepared_by_username) seed[String(p.prepared_by)] = p.prepared_by_username;
+          else if (p.prepared_by && !isNaN(Number(p.prepared_by))) {
+            // leave empty; will be fetched on demand (avoid bulk calls here)
+          }
+        }
+        if (Object.keys(seed).length) setUserNames(prev => ({ ...prev, ...seed }));
+      } catch (e) {}
 
       // Contacts
       let fetchedContacts: any[] = [];
@@ -233,15 +244,17 @@ const PaymentVouchers: React.FC = () => {
       approved_by: pv.approved_by || pv.approved_by_manual || ''
     });
     setOpen(true);
-    // Resolve reviewer/approver IDs to full_name for display
+    // Resolve prepared_by, reviewer, and approver numeric IDs to full_name for display
     try {
       const token = localStorage.getItem('token');
       const idsToResolve: string[] = [];
       const rid = pv.reviewed_by || pv.reviewed_by_manual || '';
       const aid = pv.approved_by || pv.approved_by_manual || '';
+      const pid = pv.prepared_by || '';
       if (rid && !isNaN(Number(rid))) idsToResolve.push(String(rid));
       if (aid && !isNaN(Number(aid))) idsToResolve.push(String(aid));
-      for (const id of idsToResolve) {
+      if (pid && !isNaN(Number(pid))) idsToResolve.push(String(pid));
+      for (const id of Array.from(new Set(idsToResolve))) {
         axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
           .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id })); })
           .catch(() => {});
@@ -521,7 +534,16 @@ const PaymentVouchers: React.FC = () => {
           <Box sx={{mt:2, mb:2}}>
             <Box sx={{fontWeight:700, mb:1}}>SIGNATORIES</Box>
             <Box sx={{display:'grid', gridTemplateColumns: '1fr 1fr 1fr', gap:2}}>
-                <TextField label="Prepared By" value={user?.username || ''} disabled />
+                <TextField label="Prepared By" value={(() => {
+                  // Prefer prepared_by_username on the loaded form (editing existing PV)
+                  if (form && form.prepared_by_username) return form.prepared_by_username;
+                  // If form.prepared_by is a numeric id, try cached name
+                  if (form && form.prepared_by && !isNaN(Number(form.prepared_by))) {
+                    return userNames[String(form.prepared_by)] || String(form.prepared_by);
+                  }
+                  // Fallback to current user's full name or username
+                  return user?.full_name || user?.username || '';
+                })()} disabled />
                 <TextField label="Reviewed By" value={(():any => {
                   const v = form.reviewed_by;
                   if (v && !isNaN(Number(v))) return userNames[String(v)] || String(v);
