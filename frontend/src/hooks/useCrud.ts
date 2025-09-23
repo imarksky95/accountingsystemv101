@@ -1,30 +1,26 @@
 import { useState, useCallback } from 'react';
 import axios from 'axios';
+import { buildUrl, API_BASE as RESOLVED_API_BASE } from '../apiBase';
 
 export interface CrudOptions<T> {
-  endpoint: string;
+  endpoint: string; // e.g. '/api/contacts'
   initialData?: T[];
 }
-
-// Normalize API base: prefer build-time override, otherwise fallback
-let API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
-// Strip trailing slash for consistent concatenation
-API_BASE = API_BASE.replace(/\/$/, '');
-// Debug: print resolved API base so deployed bundle shows which host it's using
-console.log('useCrud: resolved API_BASE =', API_BASE);
 
 export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
   const [data, setData] = useState<T[]>(initialData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch all
+  console.debug && console.debug('useCrud: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
+
+  const makeUrl = (ep: string) => buildUrl(ep.startsWith('/') ? ep : '/' + ep);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${path}`;
+      const url = makeUrl(endpoint);
       const res = await axios.get(url);
       setData(res.data);
     } catch (err: any) {
@@ -34,13 +30,11 @@ export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
     }
   }, [endpoint]);
 
-  // Add
   const add = useCallback(async (item: Partial<T>) => {
     setLoading(true);
     setError(null);
     try {
-  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${path}`;
+      const url = makeUrl(endpoint);
       await axios.post(url, item);
       await fetchAll();
     } catch (err: any) {
@@ -50,14 +44,12 @@ export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
     }
   }, [endpoint, fetchAll]);
 
-  // Update
   const update = useCallback(async (id: string | number, item: Partial<T>) => {
     setLoading(true);
     setError(null);
     try {
-  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const base = endpoint.startsWith('http') ? endpoint : `${API_BASE}${path}`;
-      await axios.put(`${base}/${id}`, item);
+      const url = makeUrl(`${endpoint}/${id}`);
+      await axios.put(url, item);
       await fetchAll();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message);
@@ -66,14 +58,12 @@ export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
     }
   }, [endpoint, fetchAll]);
 
-  // Delete
   const remove = useCallback(async (id: string | number) => {
     setLoading(true);
     setError(null);
     try {
-  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const base = endpoint.startsWith('http') ? endpoint : `${API_BASE}${path}`;
-      await axios.delete(`${base}/${id}`);
+      const url = makeUrl(`${endpoint}/${id}`);
+      await axios.delete(url);
       await fetchAll();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message);

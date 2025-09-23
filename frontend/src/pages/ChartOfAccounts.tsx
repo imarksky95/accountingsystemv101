@@ -7,8 +7,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 
-// API base recognition
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
+import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
+console.debug && console.debug('ChartOfAccounts: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
 
 
 // Predefined account types grouped by category
@@ -76,7 +76,7 @@ const ChartOfAccounts: React.FC = () => {
 
 	const fetchAccounts = async () => {
 		setLoading(true);
-		const res = await fetch(`${API_BASE_URL}/api/coa`);
+		const res = await tryFetchWithFallback('/api/coa');
 		let data;
 		try {
 			data = await res.json();
@@ -90,7 +90,7 @@ const ChartOfAccounts: React.FC = () => {
 	};
 
 	const fetchParentOptions = async () => {
-		const res = await fetch(`${API_BASE_URL}/api/coa/all/simple`);
+		const res = await tryFetchWithFallback('/api/coa/all/simple');
 		let data;
 		try {
 			data = await res.json();
@@ -153,13 +153,13 @@ const ChartOfAccounts: React.FC = () => {
 		try {
 			let response;
 			if (editId) {
-				response = await fetch(`${API_BASE_URL}/api/coa/${editId}`, {
+				response = await fetch(buildUrl(`/api/coa/${editId}`), {
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify(payload),
 				});
 			} else {
-				response = await fetch(`${API_BASE_URL}/api/coa`, {
+				response = await fetch(buildUrl('/api/coa'), {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify(payload),
@@ -182,7 +182,7 @@ const ChartOfAccounts: React.FC = () => {
 	};
 
 	const handleDelete = async (id: number) => {
-	await fetch(`${API_BASE_URL}/api/coa/${id}`, { method: 'DELETE' });
+	await fetch(buildUrl(`/api/coa/${id}`), { method: 'DELETE' });
 		await fetchAccounts();
 		await fetchParentOptions(); // update parent dropdown immediately
 	};

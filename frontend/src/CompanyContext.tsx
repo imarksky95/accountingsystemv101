@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from './apiBase';
 
 export type CompanyContextType = {
   companyName: string;
@@ -18,11 +19,10 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     let mounted = true;
-  const API_BASE = (process.env.REACT_APP_API_BASE_URL && process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '')) || window.location.origin || 'https://accountingsystemv101-1.onrender.com';
-  console.debug && console.debug('useCrud: resolved API_BASE =', API_BASE);
+    console.debug && console.debug('CompanyProvider: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
     const fetchProfile = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/company-profile`, { cache: 'no-store' });
+        const res = await tryFetchWithFallback('/api/company-profile', { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
         const name = data.company_name ?? data.NAME ?? data.name ?? '';

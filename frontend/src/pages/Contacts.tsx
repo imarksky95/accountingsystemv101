@@ -6,7 +6,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
+import { buildUrl, tryFetchWithFallback } from '../apiBase';
 
 interface Contact {
   contact_id: number;
@@ -31,7 +31,7 @@ const Contacts: React.FC = () => {
   const fetchContacts = async () => {
     setLoading(true);
     try {
-  const res = await window.fetch(`${API_BASE_URL}/api/contacts`);
+      const res = await tryFetchWithFallback('/api/contacts');
       const data = await res.json();
       setItems(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -70,10 +70,10 @@ const Contacts: React.FC = () => {
       if (editId) {
         const payload: any = { display_name: form.display_name, contact_type: form.contact_type, contact_info: form.contact_info };
         if (form.contact_control) payload.contact_control = form.contact_control;
-        res = await window.fetch(`${API_BASE_URL}/api/contacts/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(payload) });
+        res = await window.fetch(buildUrl(`/api/contacts/${editId}`), { method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(payload) });
       } else {
         const payload = { display_name: form.display_name, contact_type: form.contact_type, contact_info: form.contact_info };
-        res = await window.fetch(`${API_BASE_URL}/api/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(payload) });
+        res = await window.fetch(buildUrl('/api/contacts'), { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(payload) });
       }
       if (!res.ok) throw new Error('Save failed');
       await fetchContacts();
@@ -93,7 +93,7 @@ const Contacts: React.FC = () => {
   const confirmDelete = async () => {
     if (!confirmId) return;
     try {
-      await window.fetch(`${API_BASE_URL}/api/contacts/${confirmId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
+  await window.fetch(buildUrl(`/api/contacts/${confirmId}`), { method: 'DELETE', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
       setConfirmOpen(false);
       setConfirmId(null);
       await fetchContacts();

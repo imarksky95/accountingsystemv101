@@ -22,11 +22,8 @@ import {
 } from '@mui/material';
 
 // Basic users fetch for multi-select options
-let API_BASE = (process.env.REACT_APP_API_BASE_URL && process.env.REACT_APP_API_BASE_URL !== '')
-  ? process.env.REACT_APP_API_BASE_URL
-  : (window?.location?.origin || '');
-API_BASE = API_BASE.replace(/\/$/, '');
-console.debug && console.debug('UsersAndRoleSettings: resolved API_BASE =', API_BASE);
+import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
+console.debug && console.debug('UsersAndRoleSettings: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
 
 function initials(name?: string) {
   if (!name) return '';
@@ -48,15 +45,10 @@ export default function UsersAndRoleSettings() {
   useEffect(() => {
     async function fetchUsers() {
       try {
-          const path = '/api/contacts';
-          const url = API_BASE ? `${API_BASE}${path}` : path;
-          console.debug && console.debug('UsersAndRoleSettings: fetching users', url);
-          const fallback = 'https://accountingsystemv101-1.onrender.com' + path;
-          let res = await fetch(url, { cache: 'no-store' }).catch(err => {
-            console.warn('UsersAndRoleSettings: primary fetch failed, trying fallback', err && err.message ? err.message : err);
-            return fetch(fallback, { cache: 'no-store' });
-          });
-          const data = await res.json();
+        const path = '/api/contacts';
+        console.debug && console.debug('UsersAndRoleSettings: fetching contacts via tryFetchWithFallback', path);
+        const res = await tryFetchWithFallback(path, { cache: 'no-store' });
+        const data = await res.json();
         setUsers(Array.isArray(data) ? data : []);
       } catch (e) {
         console.error('Failed to fetch users', e);

@@ -2,6 +2,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useCompany } from '../CompanyContext';
 import { Box, Typography, Paper, Divider, TextField, Button, MenuItem, Avatar } from '@mui/material';
+import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
 
 const companyTypes = [
   'Freelancer',
@@ -10,9 +11,7 @@ const companyTypes = [
   'Non Profit Organization',
 ];
 
-//API base recognition (can be overridden at build time)
-const API_BASE = (process.env.REACT_APP_API_BASE_URL && process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '')) || window.location.origin || 'https://accountingsystemv101-1.onrender.com';
-console.debug && console.debug('Settings: resolved API_BASE =', API_BASE);
+console.debug && console.debug('Settings: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
 
 const Settings: React.FC = () => {
   const { setCompanyName } = useCompany();
@@ -64,12 +63,10 @@ const Settings: React.FC = () => {
       const payload = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) };
       let res;
       try {
-        res = await fetch(`${API_BASE}/api/company-profile`, payload);
-        if (!res.ok) throw new Error(`Primary save failed: ${res.status}`);
+        res = await tryFetchWithFallback('/api/company-profile', payload);
+        if (!res.ok) throw new Error(`Save failed: ${res.status}`);
       } catch (e) {
-        console.warn('Settings: primary save failed, attempting fallback host', String(e));
-        const fallback = 'https://accountingsystemv101-1.onrender.com';
-        res = await fetch(`${fallback}/api/company-profile`, payload);
+        throw e;
       }
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Save failed');
@@ -90,17 +87,7 @@ const Settings: React.FC = () => {
     let mounted = true;
     const load = async () => {
       try {
-        // Try primary API base then fallback to explicit backend host if 404/errors
-        let res;
-        try {
-          res = await fetch(`${API_BASE}/api/company-profile`);
-          if (!res.ok) throw new Error(`Primary load failed: ${res.status}`);
-        } catch (e) {
-          console.warn('Settings: primary load failed, trying fallback host', String(e));
-          const fallback = 'https://accountingsystemv101-1.onrender.com';
-          res = await fetch(`${fallback}/api/company-profile`);
-          if (!res.ok) throw new Error(`Fallback load failed: ${res.status}`);
-        }
+        const res = await tryFetchWithFallback('/api/company-profile');
         const data = await res.json();
         if (!mounted) return;
         setProfile({

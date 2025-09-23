@@ -3,9 +3,8 @@ import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextFie
 import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
 import { UserContext } from '../UserContext';
-
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
-console.debug && console.debug('PaymentVouchers: resolved API_BASE =', API_BASE);
+import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
+console.debug && console.debug('PaymentVouchers: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
 
 const emptyForm = {
   status: 'Draft',
@@ -57,7 +56,7 @@ const PaymentVouchers: React.FC = () => {
       // Fetch payment vouchers, contacts, and coas independently so one failure doesn't block the others
       let pvResData: any[] = [];
       try {
-        const pvRes = await axios.get(`${API_BASE}/api/payment-vouchers`);
+  const pvRes = await axios.get(buildUrl('/api/payment-vouchers'));
         pvResData = Array.isArray(pvRes.data) ? pvRes.data : [];
       } catch (err:any) {
         console.error('payment-vouchers fetch error', err?.response?.data || err.message || err);
@@ -68,7 +67,7 @@ const PaymentVouchers: React.FC = () => {
       // Contacts
       let fetchedContacts: any[] = [];
       try {
-        const contactRes = await axios.get(`${API_BASE}/api/contacts`);
+  const contactRes = await axios.get(buildUrl('/api/contacts'));
         fetchedContacts = Array.isArray(contactRes.data) ? contactRes.data : [];
       } catch (err:any) {
         console.error('contacts fetch error', err?.response?.data || err.message || err);
@@ -78,7 +77,7 @@ const PaymentVouchers: React.FC = () => {
       // if no contacts returned, try vendors as fallback
       if (fetchedContacts.length === 0) {
         try {
-          const vendRes = await axios.get(`${API_BASE}/api/vendors`);
+          const vendRes = await axios.get(buildUrl('/api/vendors'));
           const vendors = Array.isArray(vendRes.data) ? vendRes.data : [];
           // Map vendors to contact-like shape
           const mapped = vendors.map(v => ({ contact_id: v.vendor_id, display_name: v.name, contact_type: 'Vendor' }));
@@ -95,14 +94,14 @@ const PaymentVouchers: React.FC = () => {
 
       // COA
       try {
-        const coaRes = await axios.get(`${API_BASE}/api/coa/all/simple`);
+  const coaRes = await axios.get(buildUrl('/api/coa/all/simple'));
         const c = Array.isArray(coaRes.data) ? coaRes.data : [];
         console.log('coas fetched count=', c.length, c.slice(0,5));
         setCoas(c);
       } catch (err:any) {
         console.warn('coa fetch primary failed, trying fallback', err?.response?.data || err.message || err);
         try {
-          const fb = await axios.get(`${API_BASE}/api/coa/all/simple/fallback`);
+          const fb = await axios.get(buildUrl('/api/coa/all/simple/fallback'));
           const c2 = Array.isArray(fb.data) ? fb.data : [];
           console.log('coa fetched fallback count=', c2.length, c2.slice(0,5));
           setCoas(c2);
@@ -119,7 +118,7 @@ const PaymentVouchers: React.FC = () => {
   const fetchCoas = async () => {
     try {
       // Use the same simple fetch style as `Contacts.tsx` for consistent behavior
-      const res = await window.fetch(`${API_BASE}/api/coa/all/simple`);
+  const res = await tryFetchWithFallback('/api/coa/all/simple');
       if (!res.ok) throw new Error(`COA primary fetch failed: ${res.status}`);
       const data = await res.json();
       const c = Array.isArray(data) ? data : [];
@@ -128,7 +127,7 @@ const PaymentVouchers: React.FC = () => {
     } catch (err:any) {
       console.warn('coa fetch primary failed, trying fallback', err?.message || err);
       try {
-        const fbRes = await window.fetch(`${API_BASE}/api/coa/all/simple/fallback`);
+  const fbRes = await tryFetchWithFallback('/api/coa/all/simple/fallback');
         if (!fbRes.ok) throw new Error(`COA fallback fetch failed: ${fbRes.status}`);
         const data2 = await fbRes.json();
         const c2 = Array.isArray(data2) ? data2 : [];
@@ -144,12 +143,12 @@ const PaymentVouchers: React.FC = () => {
 
   const fetchContacts = async () => {
     try {
-      const contactRes = await axios.get(`${API_BASE}/api/contacts`);
+  const contactRes = await axios.get(buildUrl('/api/contacts'));
       const fetchedContacts = Array.isArray(contactRes.data) ? contactRes.data : [];
       if (!fetchedContacts || fetchedContacts.length === 0) {
         // fallback to vendors
         try {
-          const vendRes = await axios.get(`${API_BASE}/api/vendors`);
+          const vendRes = await axios.get(buildUrl('/api/vendors'));
           const vendors = Array.isArray(vendRes.data) ? vendRes.data : [];
           const mapped = vendors.map((v:any) => ({ contact_id: v.vendor_id, display_name: v.name, contact_type: 'Vendor' }));
           setContacts(mapped);
@@ -173,7 +172,7 @@ const PaymentVouchers: React.FC = () => {
     await Promise.all([fetchContacts(), fetchCoas()]);
     // compute expected control based on current count (matches backend behavior)
     try {
-      const res = await axios.get(`${API_BASE}/api/payment-vouchers/simple`);
+  const res = await axios.get(buildUrl('/api/payment-vouchers/simple'));
       const rows = Array.isArray(res.data) ? res.data : [];
       setExpectedControl(`PV-${rows.length + 1}`);
     } catch (e:any) {
@@ -219,7 +218,9 @@ const PaymentVouchers: React.FC = () => {
 
   React.useEffect(() => {
     // fetch company profile for header
-    axios.get(`${API_BASE}/api/company-profile`).then(r => setCompanyProfile(r.data)).catch(() => setCompanyProfile(null));
+    tryFetchWithFallback('/api/company-profile', { cache: 'no-store' })
+      .then(r => r.ok ? r.json().then(d => setCompanyProfile(d)) : setCompanyProfile(null))
+      .catch(() => setCompanyProfile(null));
   }, []);
 
   const downloadPdf = async (pvId: number | string | undefined) => {
@@ -228,7 +229,7 @@ const PaymentVouchers: React.FC = () => {
       const token = localStorage.getItem('token');
       const headers: any = {};
       if (token) headers.Authorization = `Bearer ${token}`;
-      const resp = await fetch(`${API_BASE}/api/payment-vouchers/${pvId}/pdf`, { headers });
+  const resp = await tryFetchWithFallback(`/api/payment-vouchers/${pvId}/pdf`, { headers });
       if (!resp.ok) {
         const txt = await resp.text();
         let msg = txt;
@@ -266,7 +267,7 @@ const PaymentVouchers: React.FC = () => {
     if (deleteId == null) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`${API_BASE}/api/payment-vouchers/${deleteId}`, { headers: { Authorization: `Bearer ${token}` } });
+  await axios.delete(buildUrl(`/api/payment-vouchers/${deleteId}`), { headers: { Authorization: `Bearer ${token}` } });
       setSnackMsg('Deleted'); setSnackSeverity('success'); setSnackOpen(true);
       setConfirmOpen(false); setDeleteId(null);
       fetchAll();
@@ -284,7 +285,7 @@ const PaymentVouchers: React.FC = () => {
     setCreatingDR(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_BASE}/api/disbursement-reports`, {
+  await axios.post(buildUrl('/api/disbursement-reports'), {
         status: 'Draft',
         disbursement_date: new Date().toISOString().slice(0,10),
         purpose: 'Created from selected PVs',
@@ -523,10 +524,10 @@ const PaymentVouchers: React.FC = () => {
             try {
               const token = localStorage.getItem('token');
               if (editing) {
-                await axios.put(`${API_BASE}/api/payment-vouchers/${editing.payment_voucher_id}`, payload, { headers: { Authorization: `Bearer ${token}` } });
+                await axios.put(buildUrl(`/api/payment-vouchers/${editing.payment_voucher_id}`), payload, { headers: { Authorization: `Bearer ${token}` } });
                 setSnackMsg('Payment Voucher updated'); setSnackSeverity('success'); setSnackOpen(true); setOpen(false); fetchAll();
               } else {
-                const res = await axios.post(`${API_BASE}/api/payment-vouchers`, payload, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await axios.post(buildUrl('/api/payment-vouchers'), payload, { headers: { Authorization: `Bearer ${token}` } });
                 const ctrl = res.data && res.data.payment_voucher_control ? res.data.payment_voucher_control : null;
                 setSnackMsg(ctrl ? `Payment Voucher created (${ctrl})` : 'Payment Voucher created'); setSnackSeverity('success'); setSnackOpen(true); setOpen(false); fetchAll();
               }

@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
+import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
 
-let API_BASE = (process.env.REACT_APP_API_BASE_URL && process.env.REACT_APP_API_BASE_URL !== '')
-  ? process.env.REACT_APP_API_BASE_URL
-  : (window?.location?.origin || '');
-API_BASE = API_BASE.replace(/\/$/, '');
-console.debug && console.debug('useRoles: resolved API_BASE =', API_BASE);
+console.debug && console.debug('useRoles: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
 
 export function useRoles() {
   const [roles, setRoles] = useState<any[]>([]);
@@ -14,16 +11,9 @@ export function useRoles() {
     setLoading(true);
     try {
       const path = `/api/roles`;
-      const primary = API_BASE ? `${API_BASE}${path}` : path;
-      const fallback = 'https://accountingsystemv101-1.onrender.com' + path;
-      console.debug && console.debug('useRoles: fetching', primary);
-      let res = await fetch(primary, { cache: 'no-store' }).catch(err => {
-        console.warn('useRoles: primary fetch failed, trying fallback', err && err.message ? err.message : err);
-        return fetch(fallback, { cache: 'no-store' });
-      });
+      const res = await tryFetchWithFallback(path, { cache: 'no-store' });
       console.debug && console.debug('useRoles: response status', res.status);
-  console.debug && console.debug('useRoles: response status', res.status);
-  const data = await res.json();
+      const data = await res.json();
       setRoles(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error('Failed to fetch roles', e);
@@ -34,9 +24,9 @@ export function useRoles() {
 
   async function updateRole(roleId: number, payload: any) {
     try {
-      const token = localStorage.getItem('token');
+  const token = localStorage.getItem('token');
   const path = `/api/roles/${roleId}`;
-  const url = API_BASE ? `${API_BASE}${path}` : path;
+  const url = buildUrl(path);
   const res = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },

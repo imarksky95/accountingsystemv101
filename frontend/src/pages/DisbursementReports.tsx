@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useCrud } from '../hooks/useCrud';
 import axios from 'axios';
 import { Snackbar, Alert, CircularProgress } from '@mui/material';
-
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
+import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
+console.debug && console.debug('DisbursementReports: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
 
 export default function DisbursementReports() {
   const { data: reports, loading, error, fetchAll } = useCrud<any>({ endpoint: '/api/disbursement-reports' });
@@ -13,8 +13,8 @@ export default function DisbursementReports() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    // fetch available payment vouchers
-    axios.get(`${API_BASE}/api/payment-vouchers`).then(r => setPvList(r.data)).catch(() => {});
+  // fetch available payment vouchers
+  axios.get(buildUrl('/api/payment-vouchers')).then(r => setPvList(r.data)).catch(() => {});
   }, []);
 
   React.useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -36,7 +36,7 @@ export default function DisbursementReports() {
           <h3>Available Payment Vouchers</h3>
           <div>
             <button onClick={() => setSelected({})}>Clear</button>
-            <button onClick={() => axios.get(`${API_BASE}/api/payment-vouchers`).then(r => setPvList(r.data)).catch(() => {})}>Refresh</button>
+            <button onClick={() => axios.get(buildUrl('/api/payment-vouchers')).then(r => setPvList(r.data)).catch(() => {})}>Refresh</button>
           </div>
           <ul>
             {pvList.map(pv => (
@@ -59,7 +59,7 @@ export default function DisbursementReports() {
               setCreating(true);
               try {
                 const token = localStorage.getItem('token');
-                await axios.post(`${API_BASE}/api/disbursement-reports`, {
+                await axios.post(buildUrl('/api/disbursement-reports'), {
                   status: 'Draft',
                   disbursement_date: new Date().toISOString().slice(0,10),
                   purpose: 'Bulk created from UI',
