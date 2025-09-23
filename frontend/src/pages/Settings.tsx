@@ -212,19 +212,49 @@ function AccountEditor({ open, onClose }: { open: boolean; onClose: () => void }
     (async () => {
       try {
         setLoading(true);
-        const res = await fetch(buildUrl('/api/account'), { headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
-        if (res.ok) {
+        const token = localStorage.getItem('token') || '';
+        let res;
+        try {
+          res = await fetch(buildUrl('/api/account'), { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+        } catch (e) {
+          console.warn('AccountEditor: /api/account fetch failed to reach server', e);
+          res = null;
+        }
+
+        if (res && res.ok) {
           const data = await res.json();
           setValues(data || {});
-          // initialize manual-mode flags based on presence of manual name fields
           setReviewerManualMode(!!(data && data.reviewer_manual));
           setApproverManualMode(!!(data && data.approver_manual));
+        } else {
+          // fallback: try to populate from localStorage `user` saved at login
+          try {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+              const u = JSON.parse(userStr);
+              const fallback = { full_name: u.full_name || u.username || '', email: u.email || '', mobile: u.mobile || '' };
+              setValues((v:any) => ({ ...v, ...fallback }));
+              // leave manual modes as false by default unless manual names are present
+            }
+          } catch (e) {
+            console.warn('AccountEditor: failed to parse localStorage user for fallback', e);
+          }
+          if (res && res !== null) {
+            // log response status for easier debugging
+            try { const body = await res.text(); console.warn('AccountEditor: /api/account returned non-ok', res.status, body); } catch (e) {}
+          }
         }
-        // load reviewer/approver lists filtered by role_type
-        const rres = await fetch(buildUrl('/api/users/public?role_type=reviewer'));
-        if (rres.ok) { setReviewerOptions(await rres.json()); }
-        const ares = await fetch(buildUrl('/api/users/public?role_type=approver'));
-        if (ares.ok) { setApproverOptions(await ares.json()); }
+
+        // load reviewer/approver lists filtered by role_type (these are public endpoints)
+        try {
+          const rres = await fetch(buildUrl('/api/users/public?role_type=reviewer'));
+          if (rres.ok) { setReviewerOptions(await rres.json()); }
+        } catch (e) { console.warn('Failed to load reviewer options', e); }
+        try {
+          const ares = await fetch(buildUrl('/api/users/public?role_type=approver'));
+          if (ares.ok) { setApproverOptions(await ares.json()); }
+        } catch (e) { console.warn('Failed to load approver options', e); }
+
       } catch (e) {
         console.error('AccountEditor load error', e);
       } finally { setLoading(false); }
