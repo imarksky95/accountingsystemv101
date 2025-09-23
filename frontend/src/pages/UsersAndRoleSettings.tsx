@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { formatDateToMMDDYYYY } from '../utils/date';
 import { useRoles } from '../hooks/useRoles';
 import {
   Box,
@@ -192,7 +193,7 @@ export default function UsersAndRoleSettings() {
                             <TableCell>{u.full_name || '—'}</TableCell>
                             <TableCell>{u.username}</TableCell>
                             <TableCell>{(roles.find(r => Number(r.role_id) === Number(u.role_id)) || {}).role_name || `ID ${u.role_id}`}</TableCell>
-                            <TableCell>{u.created_at ? new Date(u.created_at).toLocaleString() : '—'}</TableCell>
+                            <TableCell>{u.created_at ? formatDateToMMDDYYYY(u.created_at) : '—'}</TableCell>
                             <TableCell align="right">
                               {user && Number(user.role_id) === 1 ? (
                                 <>

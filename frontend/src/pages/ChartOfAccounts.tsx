@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formatDateToMMDDYYYY } from '../utils/date';
 import {
 	Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, MenuItem, Select, InputLabel, FormControl, SelectChangeEvent
 } from '@mui/material';
@@ -257,7 +258,7 @@ const ChartOfAccounts: React.FC = () => {
 					</TableCell>
 					<TableCell>{node.account_type}</TableCell>
 					<TableCell>{node.parent_account_name || '-'}</TableCell>
-					<TableCell>{new Date(node.created_at).toLocaleString()}</TableCell>
+					<TableCell>{formatDateToMMDDYYYY(node.created_at)}</TableCell>
 					<TableCell align="right">
 						<IconButton onClick={() => handleOpen(node)}><EditIcon /></IconButton>
 						<IconButton color="error" onClick={() => handleDelete(node.coa_id)}><DeleteIcon /></IconButton>

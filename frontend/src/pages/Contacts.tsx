@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formatDateToMMDDYYYY } from '../utils/date';
 import {
   Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, MenuItem, Select, InputLabel, FormControl
 } from '@mui/material';
@@ -125,7 +126,7 @@ const Contacts: React.FC = () => {
                 <TableCell>{it.display_name}</TableCell>
                 <TableCell>{it.contact_type}</TableCell>
                 <TableCell>{it.contact_info}</TableCell>
-                <TableCell>{new Date(it.created_at).toLocaleString()}</TableCell>
+                <TableCell>{formatDateToMMDDYYYY(it.created_at)}</TableCell>
                 <TableCell align="right">
                   <IconButton onClick={() => handleOpen(it)}><EditIcon /></IconButton>
                   <IconButton color="error" onClick={() => handleDelete(it.contact_id)}><DeleteIcon /></IconButton>

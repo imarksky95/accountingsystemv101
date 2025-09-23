@@ -1,13 +1,17 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { getMe } from './auth';
 
-interface User {
+export interface User {
   user_id: number;
   username: string;
   role_id: number;
   full_name?: string;
   email?: string;
   mobile?: string;
+  reviewer_id?: number | null;
+  approver_id?: number | null;
+  reviewer_manual?: string | null;
+  approver_manual?: string | null;
 }
 
 

@@ -3,6 +3,7 @@ import { useCrud } from '../hooks/useCrud';
 import axios from 'axios';
 import { Snackbar, Alert, CircularProgress } from '@mui/material';
 import { buildUrl, API_BASE as RESOLVED_API_BASE } from '../apiBase';
+import { formatDateToMMDDYYYY } from '../utils/date';
 console.debug && console.debug('DisbursementReports: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
 
 export default function DisbursementReports() {
@@ -88,7 +89,7 @@ export default function DisbursementReports() {
           <li key={r.disbursement_report_id} style={{marginBottom: '1rem'}}>
             <div style={{display:'flex',justifyContent:'space-between'}}>
               <div>
-                <strong>{r.disbursement_report_ctrl_number}</strong> — {r.disbursement_date} — {r.status}
+                <strong>{r.disbursement_report_ctrl_number}</strong> — {formatDateToMMDDYYYY(r.disbursement_date)} — {r.status}
               </div>
               <div>
                 <button onClick={() => setExpanded(prev => ({...prev, [r.disbursement_report_id]: !prev[r.disbursement_report_id]}))}>
@@ -109,7 +110,7 @@ export default function DisbursementReports() {
                           <td>{v.payment_voucher_control}</td>
                           <td>{v.payee_name || (v.payment_lines && v.payment_lines[0] && (v.payment_lines[0].payee_display || v.payment_lines[0].payee_contact_id)) || ''}</td>
                           <td>{v.amount_to_pay || (v.payment_lines && v.payment_lines.length ? v.payment_lines.reduce((ss:any,l:any)=>ss + (Number(l.amount)||0),0) : 0)}</td>
-                          <td>{v.preparation_date}</td>
+                          <td>{formatDateToMMDDYYYY(v.preparation_date)}</td>
                         </tr>
                       ))}
                     </tbody>

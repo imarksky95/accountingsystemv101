@@ -2,11 +2,27 @@ import React, { useState, useContext, useRef } from 'react';
 import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, Snackbar, Alert, CircularProgress, IconButton, Table, TableHead, TableRow, TableCell, TableBody, Checkbox } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
-import { UserContext } from '../UserContext';
+import { UserContext, User } from '../UserContext';
 import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
+import { formatDateToMMDDYYYY } from '../utils/date';
 console.debug && console.debug('PaymentVouchers: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
 
-const emptyForm = {
+interface PaymentLine { payee_id?: string | number; payee_contact_id?: number | null; payee_name?: string; payee_display?: string; description?: string; amount?: number | string }
+interface JournalLine { coa_id?: string | number | null; debit?: number | string; credit?: number | string; remarks?: string }
+interface PVForm {
+  status?: string;
+  preparation_date?: string;
+  purpose?: string;
+  paid_through?: string;
+  prepared_by?: number | string | null;
+  description?: string;
+  payment_lines?: PaymentLine[];
+  journal_lines?: JournalLine[];
+  reviewed_by?: number | string;
+  approved_by?: number | string;
+}
+
+const emptyForm: PVForm = {
   status: 'Draft',
   preparation_date: '',
   purpose: '',
@@ -29,7 +45,7 @@ const PaymentVouchers: React.FC = () => {
   // Dialog state
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [form, setForm] = useState<any>(emptyForm);
+  const [form, setForm] = useState<PVForm>(emptyForm);
   const [expectedControl, setExpectedControl] = useState<string>('');
   const firstFocusRef = useRef<HTMLInputElement | null>(null);
   const [companyProfile, setCompanyProfile] = useState<any>(null);
@@ -54,7 +70,7 @@ const PaymentVouchers: React.FC = () => {
     setLoading(true);
     try {
       // Fetch payment vouchers, contacts, and coas independently so one failure doesn't block the others
-      let pvResData: any[] = [];
+  let pvResData: Array<any> = [];
       try {
   const pvRes = await axios.get(buildUrl('/api/payment-vouchers'));
         pvResData = Array.isArray(pvRes.data) ? pvRes.data : [];
@@ -63,20 +79,34 @@ const PaymentVouchers: React.FC = () => {
         // keep pvResData as empty array
       }
       setItems(pvResData);
-      // Seed userNames cache from any prepared_by_username or numeric prepared_by in the fetched PVs
+      // Seed userNames cache from any prepared_by_username in the fetched PVs
       try {
         const seed: Record<string,string> = {};
+        const idsToFetch = new Set<string>();
         for (const p of pvResData) {
           if (p.prepared_by_username) seed[String(p.prepared_by)] = p.prepared_by_username;
           else if (p.prepared_by && !isNaN(Number(p.prepared_by))) {
-            // leave empty; will be fetched on demand (avoid bulk calls here)
+            const sid = String(p.prepared_by);
+            // queue numeric ids that we don't already have in cache
+            if (!userNames[sid]) idsToFetch.add(sid);
           }
         }
         if (Object.keys(seed).length) setUserNames(prev => ({ ...prev, ...seed }));
+        if (idsToFetch.size) {
+          const token = localStorage.getItem('token');
+          await Promise.all(Array.from(idsToFetch).map(async id => {
+            try {
+              const r = await axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+              if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id }));
+            } catch (e) {
+              // don't block others; leave id unresolved
+            }
+          }));
+        }
       } catch (e) {}
 
       // Contacts
-      let fetchedContacts: any[] = [];
+  let fetchedContacts: Array<{ contact_id: number; display_name: string; contact_type?: string }> = [];
       try {
   const contactRes = await axios.get(buildUrl('/api/contacts'));
         fetchedContacts = Array.isArray(contactRes.data) ? contactRes.data : [];
@@ -192,26 +222,26 @@ const PaymentVouchers: React.FC = () => {
     }
     setEditing(null);
     // Refresh current user from server to ensure workflow fields are up-to-date
-    let refreshedUser: any = null;
+  let refreshedUser: User | null = null;
     try {
       const token = localStorage.getItem('token');
       const resp = await axios.get(buildUrl('/api/auth/me'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (resp && resp.data) refreshedUser = resp.data;
     } catch (e) {
       // fallback to local context
-      refreshedUser = user as any;
+      refreshedUser = user as User | null;
     }
     // derive signatories from refreshed user's workflow settings (prefer id then manual)
-    let reviewed_by_val: any = '';
-    let approved_by_val: any = '';
+  let reviewed_by_val: number | string = '';
+  let approved_by_val: number | string = '';
     try {
-      const me = refreshedUser as any;
+      const me: User | null = refreshedUser as User | null;
       if (me) {
-        const _me: any = me;
+        const _me: User = me;
         if (_me.reviewer_id) reviewed_by_val = _me.reviewer_id;
-        else if (_me.reviewer_manual) reviewed_by_val = _me.reviewer_manual;
+        else if (_me.reviewer_manual) reviewed_by_val = _me.reviewer_manual as string;
         if (_me.approver_id) approved_by_val = _me.approver_id;
-        else if (_me.approver_manual) approved_by_val = _me.approver_manual;
+        else if (_me.approver_manual) approved_by_val = _me.approver_manual as string;
       }
       // seed userNames cache with current user's full_name for prepared_by
       if (me && me.user_id) {
@@ -220,14 +250,14 @@ const PaymentVouchers: React.FC = () => {
       // seed reviewer/approver names from refreshed user workflow if numeric
       try {
         const token = localStorage.getItem('token');
-        if (me && (me as any).reviewer_id && !isNaN(Number((me as any).reviewer_id))) {
-          const rid = String((me as any).reviewer_id);
+        if (me && me.reviewer_id && !isNaN(Number(me.reviewer_id))) {
+          const rid = String(me.reviewer_id);
           axios.get(buildUrl(`/api/users/${rid}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
             .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [rid]: r.data.full_name || r.data.username || rid })); })
             .catch(() => {});
         }
-        if (me && (me as any).approver_id && !isNaN(Number((me as any).approver_id))) {
-          const aid = String((me as any).approver_id);
+        if (me && me.approver_id && !isNaN(Number(me.approver_id))) {
+          const aid = String(me.approver_id);
           axios.get(buildUrl(`/api/users/${aid}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
             .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [aid]: r.data.full_name || r.data.username || aid })); })
             .catch(() => {});
@@ -268,7 +298,8 @@ const PaymentVouchers: React.FC = () => {
     } catch (e) {}
     setOpen(true);
   };
-  const openEdit = async (pv: any) => {
+  interface PVItem { payment_voucher_id?: number; payment_voucher_control?: string; payment_lines?: PaymentLine[]; journal_lines?: JournalLine[]; reviewed_by?: number | string; reviewed_by_manual?: string; approved_by?: number | string; approved_by_manual?: string; prepared_by?: number | string }
+  const openEdit = async (pv: PVItem) => {
     await Promise.all([fetchContacts(), fetchCoas()]);
     setEditing(pv);
     setExpectedControl(pv.payment_voucher_control || '');
@@ -323,7 +354,7 @@ const PaymentVouchers: React.FC = () => {
     if (!pvId) return;
     try {
       const token = localStorage.getItem('token');
-      const headers: any = {};
+  const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
   const resp = await tryFetchWithFallback(`/api/payment-vouchers/${pvId}/pdf`, { headers });
       if (!resp.ok) {
@@ -415,6 +446,7 @@ const PaymentVouchers: React.FC = () => {
               <TableCell></TableCell>
               <TableCell>PV Ctrl</TableCell>
               <TableCell>Prepared</TableCell>
+              <TableCell>Prepared Date</TableCell>
               <TableCell>Purpose</TableCell>
               <TableCell>Amount</TableCell>
               <TableCell>Actions</TableCell>
@@ -425,7 +457,8 @@ const PaymentVouchers: React.FC = () => {
               <TableRow key={pv.payment_voucher_id}>
                 <TableCell><Checkbox checked={!!selected[pv.payment_voucher_id]} onChange={() => toggleSelect(pv.payment_voucher_id)} /></TableCell>
                 <TableCell>{pv.payment_voucher_control}</TableCell>
-                <TableCell>{pv.preparation_date} by {pv.prepared_by_username || pv.prepared_by}</TableCell>
+                <TableCell>{pv.prepared_by_username || (pv.prepared_by && !isNaN(Number(pv.prepared_by)) ? (userNames[String(pv.prepared_by)] || String(pv.prepared_by)) : (pv.prepared_by || ''))}</TableCell>
+                <TableCell>{formatDateToMMDDYYYY(pv.preparation_date)}</TableCell>
                 <TableCell>{pv.purpose || '-'}</TableCell>
                 <TableCell>{pv.amount_to_pay || (pv.payment_lines && pv.payment_lines.length ? pv.payment_lines.reduce((s:any,l:any)=>s + (Number(l.amount)||0),0) : 0)}</TableCell>
                 <TableCell>
@@ -436,7 +469,7 @@ const PaymentVouchers: React.FC = () => {
               </TableRow>
             ))}
             {items.length === 0 && (
-              <TableRow><TableCell colSpan={6}>No payment vouchers found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7}>No payment vouchers found.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -483,7 +516,8 @@ const PaymentVouchers: React.FC = () => {
                   <TableRow key={idx}>
                     <TableCell sx={{minWidth:200}}>
                       <Select fullWidth value={line.payee_id || line.payee || ''} onChange={e => {
-                        const v = e.target.value; const copy = {...form}; copy.payment_lines[idx].payee_id = v; copy.payment_lines[idx].payee_name = contacts.find(c=>String(c.contact_id)===String(v))?.display_name || '' ;
+                        const v = e.target.value; const copy = {...form}; copy.payment_lines = copy.payment_lines || [];
+                        copy.payment_lines[idx] = { ...(copy.payment_lines[idx] || {}), payee_id: v, payee_name: contacts.find(c=>String(c.contact_id)===String(v))?.display_name || '' };
                         setForm(copy);
                       }}>
                         <MenuItem value="">-- Select Payee --</MenuItem>
@@ -496,13 +530,13 @@ const PaymentVouchers: React.FC = () => {
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <TextField fullWidth value={line.description || ''} onChange={e => { const copy = {...form}; copy.payment_lines[idx].description = e.target.value; setForm(copy); }} />
+                      <TextField fullWidth value={line.description || ''} onChange={e => { const copy = {...form}; copy.payment_lines = copy.payment_lines || []; copy.payment_lines[idx] = { ...(copy.payment_lines[idx] || {}), description: e.target.value }; setForm(copy); }} />
                     </TableCell>
                     <TableCell align="right">
-                      <TextField type="number" value={line.amount || ''} onChange={e => { const copy = {...form}; copy.payment_lines[idx].amount = e.target.value; setForm(copy); }} InputProps={{ sx: { textAlign: 'right' } }} />
+                      <TextField type="number" value={line.amount || ''} onChange={e => { const copy = {...form}; copy.payment_lines = copy.payment_lines || []; copy.payment_lines[idx] = { ...(copy.payment_lines[idx] || {}), amount: e.target.value }; setForm(copy); }} InputProps={{ sx: { textAlign: 'right' } }} />
                     </TableCell>
                     <TableCell>
-                      <Button color="error" onClick={() => { const copy = {...form}; copy.payment_lines = copy.payment_lines.filter((_:any,i:number)=>i!==idx); setForm(copy); }}>Remove</Button>
+                      <Button color="error" onClick={() => { const copy = {...form}; copy.payment_lines = copy.payment_lines || []; copy.payment_lines = copy.payment_lines.filter((_:any,i:number)=>i!==idx); setForm(copy); }}>Remove</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -536,22 +570,22 @@ const PaymentVouchers: React.FC = () => {
                 {(form.journal_lines || []).map((line:any, idx:number) => (
                   <TableRow key={idx}>
                     <TableCell sx={{minWidth:200}}>
-                      <Select fullWidth value={String(line.coa_id || '')} onChange={e => { const copy = {...form}; copy.journal_lines[idx].coa_id = e.target.value; setForm(copy); }}>
+                      <Select fullWidth value={String(line.coa_id || '')} onChange={e => { const copy = {...form}; copy.journal_lines = copy.journal_lines || []; copy.journal_lines[idx] = { ...(copy.journal_lines[idx] || {}), coa_id: e.target.value }; setForm(copy); }}>
                         <MenuItem value="">-- Select COA --</MenuItem>
                         {coas.map((a:any) => <MenuItem key={a.coa_id} value={String(a.coa_id)}>{a.account_name || a.name || a.coa_id}</MenuItem>)}
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <TextField fullWidth value={line.debit || ''} onChange={e => { const copy = {...form}; copy.journal_lines[idx].debit = e.target.value; setForm(copy); }} InputProps={{ sx: { textAlign: 'right' } }} />
+                      <TextField fullWidth value={line.debit || ''} onChange={e => { const copy = {...form}; copy.journal_lines = copy.journal_lines || []; copy.journal_lines[idx] = { ...(copy.journal_lines[idx] || {}), debit: e.target.value }; setForm(copy); }} InputProps={{ sx: { textAlign: 'right' } }} />
                     </TableCell>
                     <TableCell>
-                      <TextField fullWidth value={line.credit || ''} onChange={e => { const copy = {...form}; copy.journal_lines[idx].credit = e.target.value; setForm(copy); }} InputProps={{ sx: { textAlign: 'right' } }} />
+                      <TextField fullWidth value={line.credit || ''} onChange={e => { const copy = {...form}; copy.journal_lines = copy.journal_lines || []; copy.journal_lines[idx] = { ...(copy.journal_lines[idx] || {}), credit: e.target.value }; setForm(copy); }} InputProps={{ sx: { textAlign: 'right' } }} />
                     </TableCell>
                     <TableCell>
-                      <TextField fullWidth value={line.remarks || ''} onChange={e => { const copy = {...form}; copy.journal_lines[idx].remarks = e.target.value; setForm(copy); }} />
+                      <TextField fullWidth value={line.remarks || ''} onChange={e => { const copy = {...form}; copy.journal_lines = copy.journal_lines || []; copy.journal_lines[idx] = { ...(copy.journal_lines[idx] || {}), remarks: e.target.value }; setForm(copy); }} />
                     </TableCell>
                     <TableCell>
-                      <Button color="error" onClick={() => { const copy = {...form}; copy.journal_lines = copy.journal_lines.filter((_:any,i:number)=>i!==idx); setForm(copy); }}>Remove</Button>
+                      <Button color="error" onClick={() => { const copy = {...form}; copy.journal_lines = copy.journal_lines || []; copy.journal_lines = copy.journal_lines.filter((_:any,i:number)=>i!==idx); setForm(copy); }}>Remove</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -581,7 +615,7 @@ const PaymentVouchers: React.FC = () => {
                   let v = form.reviewed_by;
                   // fallback to current user's workflow settings if form not seeded
                   if (!v) {
-                    const _u: any = user;
+                    const _u: User | null = user as User | null;
                     v = (_u && _u.reviewer_id) ? _u.reviewer_id : (_u && _u.reviewer_manual ? _u.reviewer_manual : '');
                   }
                   if (!v) return '';
@@ -591,7 +625,7 @@ const PaymentVouchers: React.FC = () => {
                 <TextField label="Approved By" value={(():any => {
                   let v = form.approved_by;
                   if (!v) {
-                    const _u: any = user;
+                    const _u: User | null = user as User | null;
                     v = (_u && _u.approver_id) ? _u.approver_id : (_u && _u.approver_manual ? _u.approver_manual : '');
                   }
                   if (!v) return '';
@@ -667,7 +701,7 @@ const PaymentVouchers: React.FC = () => {
               <div style={{display:'flex', justifyContent:'space-between', marginTop:10}}>
                 <div>
                   <div><strong>PV Ctrl:</strong> {previewItem.payment_voucher_control}</div>
-                  <div><strong>Prepared:</strong> {previewItem.preparation_date}</div>
+                  <div><strong>Prepared:</strong> {formatDateToMMDDYYYY(previewItem.preparation_date)}</div>
                   <div><strong>Purpose:</strong> {previewItem.purpose}</div>
                 </div>
                 <div style={{textAlign:'right'}}>
