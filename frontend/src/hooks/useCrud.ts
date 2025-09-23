@@ -6,8 +6,10 @@ export interface CrudOptions<T> {
   initialData?: T[];
 }
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
-
+// Normalize API base: prefer build-time override, otherwise fallback
+let API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://accountingsystemv101-1.onrender.com';
+// Strip trailing slash for consistent concatenation
+API_BASE = API_BASE.replace(/\/$/, '');
 // Debug: print resolved API base so deployed bundle shows which host it's using
 console.log('useCrud: resolved API_BASE =', API_BASE);
 
@@ -21,7 +23,8 @@ export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
     setLoading(true);
     setError(null);
     try {
-      const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${path}`;
       const res = await axios.get(url);
       setData(res.data);
     } catch (err: any) {
@@ -36,7 +39,8 @@ export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
     setLoading(true);
     setError(null);
     try {
-      const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${path}`;
       await axios.post(url, item);
       await fetchAll();
     } catch (err: any) {
@@ -51,7 +55,8 @@ export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
     setLoading(true);
     setError(null);
     try {
-      const base = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const base = endpoint.startsWith('http') ? endpoint : `${API_BASE}${path}`;
       await axios.put(`${base}/${id}`, item);
       await fetchAll();
     } catch (err: any) {
@@ -66,7 +71,8 @@ export function useCrud<T>({ endpoint, initialData = [] }: CrudOptions<T>) {
     setLoading(true);
     setError(null);
     try {
-      const base = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const base = endpoint.startsWith('http') ? endpoint : `${API_BASE}${path}`;
       await axios.delete(`${base}/${id}`);
       await fetchAll();
     } catch (err: any) {

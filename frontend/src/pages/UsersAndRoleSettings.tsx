@@ -22,9 +22,11 @@ import {
 } from '@mui/material';
 
 // Basic users fetch for multi-select options
-const API_BASE = (process.env.REACT_APP_API_BASE_URL && process.env.REACT_APP_API_BASE_URL !== '')
+let API_BASE = (process.env.REACT_APP_API_BASE_URL && process.env.REACT_APP_API_BASE_URL !== '')
   ? process.env.REACT_APP_API_BASE_URL
   : (window?.location?.origin || '');
+API_BASE = API_BASE.replace(/\/$/, '');
+console.debug && console.debug('UsersAndRoleSettings: resolved API_BASE =', API_BASE);
 
 function initials(name?: string) {
   if (!name) return '';
@@ -46,8 +48,15 @@ export default function UsersAndRoleSettings() {
   useEffect(() => {
     async function fetchUsers() {
       try {
-        const res = await fetch(`${API_BASE}/api/contacts`, { cache: 'no-store' });
-        const data = await res.json();
+          const path = '/api/contacts';
+          const url = API_BASE ? `${API_BASE}${path}` : path;
+          console.debug && console.debug('UsersAndRoleSettings: fetching users', url);
+          const fallback = 'https://accountingsystemv101-1.onrender.com' + path;
+          let res = await fetch(url, { cache: 'no-store' }).catch(err => {
+            console.warn('UsersAndRoleSettings: primary fetch failed, trying fallback', err && err.message ? err.message : err);
+            return fetch(fallback, { cache: 'no-store' });
+          });
+          const data = await res.json();
         setUsers(Array.isArray(data) ? data : []);
       } catch (e) {
         console.error('Failed to fetch users', e);
@@ -88,22 +97,28 @@ export default function UsersAndRoleSettings() {
 
       <Box mt={2}>
         {loading ? <CircularProgress /> : (
-          <List>
-            {roles.map(r => (
-              <ListItem key={r.role_id} secondaryAction={<Button onClick={() => openEditor(r)}>Edit</Button>}>
-                <ListItemText
-                  primary={r.role_name}
-                  secondary={
-                    <>
-                      <strong>Reviewers:</strong> {(r.reviewer || []).map((id: any) => String(id)).join(', ') || '—'}
-                      <br />
-                      <strong>Approvers:</strong> {(r.approver || []).map((id: any) => String(id)).join(', ') || '—'}
-                    </>
-                  }
-                />
-              </ListItem>
-            ))}
-          </List>
+          roles.length === 0 ? (
+            <Box p={2}>
+              <Typography>No roles found. Ensure the backend `/api/roles` endpoint is reachable and returns role rows.</Typography>
+            </Box>
+          ) : (
+            <List>
+              {roles.map(r => (
+                <ListItem key={r.role_id} secondaryAction={<Button onClick={() => openEditor(r)}>Edit</Button>}>
+                  <ListItemText
+                    primary={r.role_name}
+                    secondary={
+                      <>
+                        <strong>Reviewers:</strong> {(r.reviewer || []).map((id: any) => String(id)).join(', ') || '—'}
+                        <br />
+                        <strong>Approvers:</strong> {(r.approver || []).map((id: any) => String(id)).join(', ') || '—'}
+                      </>
+                    }
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )
         )}
       </Box>
 
