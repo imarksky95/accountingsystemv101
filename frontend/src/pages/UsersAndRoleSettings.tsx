@@ -47,8 +47,7 @@ export default function UsersAndRoleSettings() {
   const { user } = useContext(UserContext);
   const [showAddRole, setShowAddRole] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
-  const [newRoleReviewers, setNewRoleReviewers] = useState<any[]>([]);
-  const [newRoleApprovers, setNewRoleApprovers] = useState<any[]>([]);
+  
   const [newRoleType, setNewRoleType] = useState<'none'|'reviewer'|'approver'|'both'>('none');
   const [users, setUsers] = useState<any[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
@@ -58,8 +57,7 @@ export default function UsersAndRoleSettings() {
   const [newUserMobile, setNewUserMobile] = useState('');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [selReviewer, setSelReviewer] = useState<any[]>([]);
-  const [selApprover, setSelApprover] = useState<any[]>([]);
+  
   const [editRoleType, setEditRoleType] = useState<'none'|'reviewer'|'approver'|'both'>('none');
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity?: 'success' | 'error' | 'info' }>({ open: false, message: '' });
@@ -87,13 +85,8 @@ export default function UsersAndRoleSettings() {
 
   function openEditor(role: any) {
     setEditing(role);
-    setSelReviewer(Array.isArray(role.reviewer) ? role.reviewer : []);
-    setSelApprover(Array.isArray(role.approver) ? role.approver : []);
-    // infer role_type from existing role fields if available
-    const rHas = Array.isArray(role.reviewer) && role.reviewer.length > 0;
-    const aHas = Array.isArray(role.approver) && role.approver.length > 0;
-    const inferred: 'none'|'reviewer'|'approver'|'both' = rHas && aHas ? 'both' : rHas ? 'reviewer' : aHas ? 'approver' : (role.role_type || 'none');
-    setEditRoleType(inferred);
+    // infer role_type from stored field if present
+    setEditRoleType(role.role_type || 'none');
     setOpen(true);
   }
 
@@ -134,19 +127,7 @@ export default function UsersAndRoleSettings() {
     })();
   }
 
-  async function save() {
-    if (!editing) return;
-    setSaving(true);
-    try {
-      await updateRole(editing.role_id, { reviewer: selReviewer, approver: selApprover });
-      setOpen(false);
-      setSnack({ open: true, message: 'Role updated', severity: 'success' });
-    } catch (e) {
-      setSnack({ open: true, message: 'Failed to save role', severity: 'error' });
-    } finally {
-      setSaving(false);
-    }
-  }
+  
 
   const [tabIndex, setTabIndex] = useState(0);
 
@@ -232,13 +213,7 @@ export default function UsersAndRoleSettings() {
                       <ListItem key={r.role_id} secondaryAction={<Button size="small" onClick={() => openEditor(r)}>Edit</Button>} sx={{ py: 0.5 }}>
                         <ListItemText
                           primary={r.role_name}
-                          secondary={
-                            <>
-                              <strong>Reviewers:</strong> {(r.reviewer || []).map((id: any) => String(id)).join(', ') || '—'}
-                              <br />
-                              <strong>Approvers:</strong> {(r.approver || []).map((id: any) => String(id)).join(', ') || '—'}
-                            </>
-                          }
+                          secondary={<><strong>Type:</strong> {(r.role_type || 'none').toString()}</>}
                         />
                       </ListItem>
                     ))}
@@ -345,9 +320,6 @@ export default function UsersAndRoleSettings() {
                 try {
                   const token = localStorage.getItem('token') || '';
                   const payload: any = { role_name: newRoleName.trim(), role_type: newRoleType };
-                  // include reviewer/approver arrays only if provided by the UI (we keep them for backward compatibility)
-                  if (newRoleReviewers.length) payload.reviewer = newRoleReviewers;
-                  if (newRoleApprovers.length) payload.approver = newRoleApprovers;
 
                   const res = await fetch(buildUrl('/api/roles'), {
                     method: 'POST',
@@ -363,8 +335,6 @@ export default function UsersAndRoleSettings() {
                   setSnack({ open: true, message: 'Role added', severity: 'success' });
                   setShowAddRole(false);
                   setNewRoleName('');
-                  setNewRoleReviewers([]);
-                  setNewRoleApprovers([]);
                   setNewRoleType('none');
                   // refresh users and roles
                   try {
@@ -394,47 +364,7 @@ export default function UsersAndRoleSettings() {
             </TextField>
           </Box>
 
-          <Box mt={1} mb={2}>
-            <Autocomplete
-              multiple
-              options={users}
-              getOptionLabel={(opt) => opt.display_name || opt.contact_control || String(opt.contact_id)}
-              value={users.filter(u => selReviewer.includes(u.contact_id))}
-              onChange={(e, value) => setSelReviewer(value.map(v => v.contact_id))}
-              filterSelectedOptions
-              renderTags={(value: any[], getTagProps) =>
-                value.map((option, index) => (
-                  <Chip
-                    label={option.display_name || option.contact_control}
-                    avatar={<Avatar>{initials(option.display_name)}</Avatar>}
-                    {...getTagProps({ index })}
-                  />
-                ))
-              }
-              renderInput={(params) => <TextField {...params} variant="outlined" label="Reviewer(s)" placeholder="Search users..." />}
-            />
-          </Box>
-
-          <Box mt={1} mb={2}>
-            <Autocomplete
-              multiple
-              options={users}
-              getOptionLabel={(opt) => opt.display_name || opt.contact_control || String(opt.contact_id)}
-              value={users.filter(u => selApprover.includes(u.contact_id))}
-              onChange={(e, value) => setSelApprover(value.map(v => v.contact_id))}
-              filterSelectedOptions
-              renderTags={(value: any[], getTagProps) =>
-                value.map((option, index) => (
-                  <Chip
-                    label={option.display_name || option.contact_control}
-                    avatar={<Avatar>{initials(option.display_name)}</Avatar>}
-                    {...getTagProps({ index })}
-                  />
-                ))
-              }
-              renderInput={(params) => <TextField {...params} variant="outlined" label="Approver(s)" placeholder="Search users..." />}
-            />
-          </Box>
+          {/* Role now driven exclusively by role_type; reviewer/approver pickers removed */}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
@@ -442,7 +372,7 @@ export default function UsersAndRoleSettings() {
             if (!editing) return;
             setSaving(true);
             try {
-              const payload: any = { reviewer: selReviewer, approver: selApprover, role_type: editRoleType };
+              const payload: any = { role_type: editRoleType };
               await updateRole(editing.role_id, payload);
               setOpen(false);
               setSnack({ open: true, message: 'Role updated', severity: 'success' });
