@@ -18,7 +18,15 @@ import {
   Snackbar,
   Alert,
   Grid,
-  Typography
+  Typography,
+  Tabs,
+  Tab,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Paper
 } from '@mui/material';
 import { UserContext } from '../UserContext';
 
@@ -133,16 +141,18 @@ export default function UsersAndRoleSettings() {
     }
   }
 
+  const [tabIndex, setTabIndex] = useState(0);
+
   return (
-    <Box p={1}>
+    <Box p={2}>
       <Grid container alignItems="center" justifyContent="space-between">
         <Grid item>
-          <Typography variant="h6">Users and Role Settings</Typography>
-          <Typography variant="caption" color="textSecondary">Manage which users can review or approve actions per role.</Typography>
+          <Typography variant="h5">Users and Role Settings</Typography>
+          <Typography variant="body2" color="textSecondary">Manage which users can review or approve actions per role.</Typography>
         </Grid>
       </Grid>
 
-      <Box mt={1}>
+      <Box mt={2}>
         {loading ? <CircularProgress /> : (
           roles.length === 0 ? (
             <Box p={2}>
@@ -150,46 +160,82 @@ export default function UsersAndRoleSettings() {
             </Box>
           ) : (
             <>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                <Typography variant="subtitle2">Roles</Typography>
-                <Box display="flex" gap={1}>
-                  {/* Only show Add Role/User to Super Admin (role_id === 1) */}
-                  {user && Number(user.role_id) === 1 ? (
-                    <>
-                      <Button variant="outlined" onClick={() => setShowAddRole(true)}>Add Role</Button>
-                      <Button variant="contained" onClick={() => setShowAddUser(true)}>Add User</Button>
-                    </>
-                  ) : null}
-                </Box>
-              </Box>
-              <List dense disablePadding>
-                {roles.map(r => (
-                  <ListItem key={r.role_id} secondaryAction={<Button size="small" onClick={() => openEditor(r)}>Edit</Button>} sx={{ py: 0.5 }}>
-                    <ListItemText
-                      primary={r.role_name}
-                      secondary={
-                        <>
-                          <strong>Reviewers:</strong> {(r.reviewer || []).map((id: any) => String(id)).join(', ') || '—'}
-                          <br />
-                          <strong>Approvers:</strong> {(r.approver || []).map((id: any) => String(id)).join(', ') || '—'}
-                        </>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
+              <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ mb: 2 }}>
+                <Tab label="Users" />
+                <Tab label="Roles" />
+              </Tabs>
 
-              <Box mt={1}>
-                <Typography variant="subtitle2">Users</Typography>
-                <List dense disablePadding>
-                  {users.map(u => (
-                      <ListItem key={u.user_id} secondaryAction={user && Number(user.role_id) === 1 ? <Button size="small" onClick={() => openUserEditor(u)}>Edit</Button> : null} sx={{ py: 0.5 }}>
-                        <ListItemText primary={u.username} secondary={<span style={{ fontSize: '0.75rem', color: 'rgba(0,0,0,0.6)' }}>{`Role ID: ${u.role_id} • Created: ${u.created_at ? new Date(u.created_at).toLocaleString() : '—'}`}</span>} />
+              {tabIndex === 0 && (
+                <>
+                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                    <Typography variant="h6">Users</Typography>
+                    <Box>
+                      {user && Number(user.role_id) === 1 && (
+                        <>
+                          <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={() => setShowAddRole(true)}>ADD ROLE</Button>
+                          <Button variant="contained" size="small" onClick={() => setShowAddUser(true)}>ADD USER</Button>
+                        </>
+                      )}
+                    </Box>
+                  </Box>
+
+                  <Paper>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Full Name</TableCell>
+                          <TableCell>Username</TableCell>
+                          <TableCell>Role</TableCell>
+                          <TableCell>Created At</TableCell>
+                          <TableCell align="right">Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {users.map(u => (
+                          <TableRow key={u.user_id}>
+                            <TableCell>{u.full_name || '—'}</TableCell>
+                            <TableCell>{u.username}</TableCell>
+                            <TableCell>{(roles.find(r => Number(r.role_id) === Number(u.role_id)) || {}).role_name || `ID ${u.role_id}`}</TableCell>
+                            <TableCell>{u.created_at ? new Date(u.created_at).toLocaleString() : '—'}</TableCell>
+                            <TableCell align="right">
+                              {user && Number(user.role_id) === 1 ? <Button size="small" onClick={() => openUserEditor(u)}>Edit</Button> : null}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {users.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5}>No users found or insufficient permissions.</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </Paper>
+                </>
+              )}
+
+              {tabIndex === 1 && (
+                <>
+                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                    <Typography variant="h6">Roles</Typography>
+                  </Box>
+                  <List dense disablePadding>
+                    {roles.map(r => (
+                      <ListItem key={r.role_id} secondaryAction={<Button size="small" onClick={() => openEditor(r)}>Edit</Button>} sx={{ py: 0.5 }}>
+                        <ListItemText
+                          primary={r.role_name}
+                          secondary={
+                            <>
+                              <strong>Reviewers:</strong> {(r.reviewer || []).map((id: any) => String(id)).join(', ') || '—'}
+                              <br />
+                              <strong>Approvers:</strong> {(r.approver || []).map((id: any) => String(id)).join(', ') || '—'}
+                            </>
+                          }
+                        />
                       </ListItem>
                     ))}
-                  {users.length === 0 && <ListItem dense><ListItemText primary="No users found or insufficient permissions." /></ListItem>}
-                </List>
-              </Box>
+                  </List>
+                </>
+              )}
             </>
           )
         )}
