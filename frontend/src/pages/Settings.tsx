@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { useCompany } from '../CompanyContext';
-import { Box, Typography, Paper, Divider, TextField, Button, MenuItem, Avatar } from '@mui/material';
+import { Box, Typography, Paper, Divider, TextField, Button, MenuItem, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, Autocomplete } from '@mui/material';
 import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
 import UsersAndRoleSettings from './UsersAndRoleSettings';
 
@@ -27,6 +27,7 @@ const Settings: React.FC = () => {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
+  const [showAccountEditor, setShowAccountEditor] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -176,13 +177,98 @@ const Settings: React.FC = () => {
       <Paper sx={{ p: 2, mb: 2, mt: 2 }}>
         <Typography variant="h6">Account Settings</Typography>
         <Typography color="textSecondary">Account settings will be managed here.</Typography>
+        <Box mt={2}>
+          <Button variant="outlined" onClick={() => setShowAccountEditor(true)}>Edit Account</Button>
+        </Box>
       </Paper>
       <Divider />
       <Paper sx={{ p: 2, mb: 2, mt: 2 }}>
         <UsersAndRoleSettings />
       </Paper>
+
+      {/* Account editor dialog */}
+      <AccountEditor
+        open={showAccountEditor}
+        onClose={() => setShowAccountEditor(false)}
+      />
     </Box>
   );
 };
 
 export default Settings;
+
+// --- AccountEditor component ---
+
+function AccountEditor({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [, setLoading] = React.useState(false);
+  const [values, setValues] = React.useState<any>({ full_name: '', email: '', mobile: '', reviewer_id: '', approver_id: '', reviewer_manual: '', approver_manual: '' });
+  const [reviewerOptions, setReviewerOptions] = React.useState<any[]>([]);
+  const [approverOptions, setApproverOptions] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(buildUrl('/api/account'), { headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
+        if (res.ok) {
+          const data = await res.json();
+          setValues(data || {});
+        }
+        // load reviewer/approver lists filtered by role_type
+        const rres = await fetch(buildUrl('/api/users/public?role_type=reviewer'));
+        if (rres.ok) { setReviewerOptions(await rres.json()); }
+        const ares = await fetch(buildUrl('/api/users/public?role_type=approver'));
+        if (ares.ok) { setApproverOptions(await ares.json()); }
+      } catch (e) {
+        console.error('AccountEditor load error', e);
+      } finally { setLoading(false); }
+    })();
+  }, [open]);
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Edit Account</DialogTitle>
+      <DialogContent>
+        <Box display="flex" flexDirection="column" gap={2} mt={1}>
+          <TextField label="Full name" value={values.full_name || ''} onChange={(e) => setValues((v:any) => ({ ...v, full_name: e.target.value }))} fullWidth />
+          <TextField label="Email" value={values.email || ''} onChange={(e) => setValues((v:any) => ({ ...v, email: e.target.value }))} fullWidth />
+          <TextField label="Mobile" value={values.mobile || ''} onChange={(e) => setValues((v:any) => ({ ...v, mobile: e.target.value }))} fullWidth />
+
+          <Autocomplete
+            options={reviewerOptions}
+            getOptionLabel={(opt:any) => opt.full_name || opt.username || ''}
+            value={reviewerOptions.find(r => Number(r.user_id) === Number(values.reviewer_id)) || null}
+            onChange={(e, val:any) => setValues((v:any) => ({ ...v, reviewer_id: val ? val.user_id : '' }))}
+            renderInput={(params) => <TextField {...params} label="Reviewer (select)" />}
+            freeSolo
+          />
+          <TextField label="Reviewer (manual name)" value={values.reviewer_manual || ''} onChange={(e) => setValues((v:any) => ({ ...v, reviewer_manual: e.target.value }))} fullWidth />
+
+          <Autocomplete
+            options={approverOptions}
+            getOptionLabel={(opt:any) => opt.full_name || opt.username || ''}
+            value={approverOptions.find(r => Number(r.user_id) === Number(values.approver_id)) || null}
+            onChange={(e, val:any) => setValues((v:any) => ({ ...v, approver_id: val ? val.user_id : '' }))}
+            renderInput={(params) => <TextField {...params} label="Approver (select)" />}
+            freeSolo
+          />
+          <TextField label="Approver (manual name)" value={values.approver_manual || ''} onChange={(e) => setValues((v:any) => ({ ...v, approver_manual: e.target.value }))} fullWidth />
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={async () => {
+          try {
+            const token = localStorage.getItem('token') || '';
+            const payload: any = { full_name: values.full_name, email: values.email, mobile: values.mobile, reviewer_id: values.reviewer_id, approver_id: values.approver_id, reviewer_manual: values.reviewer_manual, approver_manual: values.approver_manual };
+            const res = await fetch(buildUrl('/api/account'), { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Failed to save account'); return; }
+            alert('Account updated');
+            onClose();
+          } catch (e) { console.error('Account save error', e); alert('Failed to save account'); }
+  }}>Save</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}

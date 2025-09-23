@@ -13,8 +13,7 @@ import {
   CircularProgress,
   Autocomplete,
   TextField,
-  Chip,
-  Avatar,
+  
   Snackbar,
   Alert,
   Grid,
@@ -34,12 +33,7 @@ import { UserContext } from '../UserContext';
 import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
 console.debug && console.debug('UsersAndRoleSettings: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
 
-function initials(name?: string) {
-  if (!name) return '';
-  const parts = name.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
-}
+// ...existing code...
 
 export default function UsersAndRoleSettings() {
   console.debug && console.debug('UsersAndRoleSettings: component render');
@@ -88,6 +82,16 @@ export default function UsersAndRoleSettings() {
     }
     fetchUsers();
   }, []);
+
+  // Clear Add User form whenever the Add User dialog is opened
+  useEffect(() => {
+    if (showAddUser) {
+      setNewUser({ username: '', password: '', role_id: '' });
+      setNewUserFullName('');
+      setNewUserEmail('');
+      setNewUserMobile('');
+    }
+  }, [showAddUser]);
 
   function openEditor(role: any) {
     setEditing(role);
@@ -307,8 +311,7 @@ export default function UsersAndRoleSettings() {
                 setSnack({ open: true, message: err.message || 'Failed to add user', severity: 'error' });
                 return;
               }
-                // use server response to update users list if provided
-                const data = await res.json().catch(() => null);
+                // server response ignored; just show success
                 setSnack({ open: true, message: 'User added', severity: 'success' });
               setShowAddUser(false);
               // Refresh users
@@ -359,7 +362,7 @@ export default function UsersAndRoleSettings() {
                     setSnack({ open: true, message: err.error || 'Failed to add role', severity: 'error' });
                     return;
                   }
-                  const created = await res.json().catch(() => null);
+                  // server response ignored; created role handled by refresh
                   setSnack({ open: true, message: 'Role added', severity: 'success' });
                   setShowAddRole(false);
                   setNewRoleName('');
@@ -455,7 +458,7 @@ export default function UsersAndRoleSettings() {
                 setSnack({ open: true, message: e.error || 'Failed to update user', severity: 'error' });
                 return;
               }
-              const updated = await res.json().catch(() => null);
+              // server response ignored; updated handled by refresh
               setSnack({ open: true, message: 'User updated', severity: 'success' });
               setEditingUser(null);
               // Refresh users

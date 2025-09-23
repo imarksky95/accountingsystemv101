@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCrud } from '../hooks/useCrud';
 import axios from 'axios';
 import { Snackbar, Alert, CircularProgress } from '@mui/material';
-import { buildUrl, tryFetchWithFallback, API_BASE as RESOLVED_API_BASE } from '../apiBase';
+import { buildUrl, API_BASE as RESOLVED_API_BASE } from '../apiBase';
 console.debug && console.debug('DisbursementReports: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
 
 export default function DisbursementReports() {

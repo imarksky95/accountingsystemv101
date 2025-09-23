@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Button } from '@mui/material';
 
-import { buildUrl, tryFetchWithFallback } from '../apiBase';
+import { tryFetchWithFallback } from '../apiBase';
 
 const CheckVouchers: React.FC = () => {
   const [items, setItems] = useState<any[]>([]);

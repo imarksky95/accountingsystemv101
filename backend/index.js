@@ -153,6 +153,65 @@ app.put('/api/roles/:role_id', authenticateToken, async (req, res, next) => {
       }
     });
 
+// Public users list for autocompletes (returns minimal fields). If query param role_type=reviewer|approver provided, filter roles accordingly.
+app.get('/api/users/public', async (req, res, next) => {
+  try {
+    const roleType = req.query.role_type;
+    if (roleType && ['reviewer','approver','both','none'].indexOf(String(roleType)) === -1) return res.status(400).json({ error: 'Invalid role_type' });
+    // join users -> roles to filter by role_type
+    let sql = 'SELECT u.user_id, u.username, u.full_name, u.role_id FROM users u';
+    const params = [];
+    if (roleType) {
+      sql += ' JOIN roles r ON r.role_id = u.role_id WHERE (r.role_type = ? OR r.role_type = ? )';
+      params.push(roleType, 'both');
+    }
+    const [rows] = await dbPool.execute(sql, params);
+    res.json(Array.isArray(rows) ? rows : []);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Get current user's account settings (requires auth)
+app.get('/api/account', authenticateToken, async (req, res, next) => {
+  try {
+    const userId = req.user && req.user.user_id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const [rows] = await dbPool.execute('SELECT user_id, username, full_name, email, mobile, role_id, reviewer_id, approver_id, reviewer_manual, approver_manual FROM users WHERE user_id = ?', [userId]);
+    if (!rows || rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Update current user's account settings (requires auth)
+app.put('/api/account', authenticateToken, async (req, res, next) => {
+  try {
+    const userId = req.user && req.user.user_id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const { full_name, email, mobile, reviewer_id, approver_id, reviewer_manual, approver_manual } = req.body || {};
+    const fields = [];
+    const params = [];
+    if (full_name !== undefined) { fields.push('full_name = ?'); params.push(full_name || null); }
+    if (email !== undefined) { fields.push('email = ?'); params.push(email || null); }
+    if (mobile !== undefined) { fields.push('mobile = ?'); params.push(mobile || null); }
+    if (reviewer_id !== undefined) { fields.push('reviewer_id = ?'); params.push(reviewer_id ? Number(reviewer_id) : null); }
+    if (approver_id !== undefined) { fields.push('approver_id = ?'); params.push(approver_id ? Number(approver_id) : null); }
+    if (reviewer_manual !== undefined) { fields.push('reviewer_manual = ?'); params.push(reviewer_manual || null); }
+    if (approver_manual !== undefined) { fields.push('approver_manual = ?'); params.push(approver_manual || null); }
+    if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    const sql = `UPDATE users SET ${fields.join(', ')} WHERE user_id = ?`;
+    params.push(userId);
+    const [result] = await dbPool.execute(sql, params);
+    if (result && result.affectedRows === 0) return res.status(404).json({ error: 'User not found' });
+    const [rows] = await dbPool.execute('SELECT user_id, username, full_name, email, mobile, role_id, reviewer_id, approver_id, reviewer_manual, approver_manual FROM users WHERE user_id = ?', [userId]);
+    res.json(rows && rows[0] ? rows[0] : {});
+  } catch (err) {
+    next(err);
+  }
+});
+
         // Update user details (protected; only Super Admin role_id === 1)
         app.put('/api/users/:user_id', authenticateToken, async (req, res, next) => {
           try {
