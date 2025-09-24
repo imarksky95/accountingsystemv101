@@ -15,11 +15,14 @@ interface PVForm {
   purpose?: string;
   paid_through?: string;
   prepared_by?: number | string | null;
+  prepared_by_manual?: string | null;
   description?: string;
   payment_lines?: PaymentLine[];
   journal_lines?: JournalLine[];
   reviewed_by?: number | string;
+  reviewed_by_manual?: string;
   approved_by?: number | string;
+  approved_by_manual?: string;
 }
 
 const emptyForm: PVForm = {
@@ -52,6 +55,40 @@ const PaymentVouchers: React.FC = () => {
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<any | null>(null);
+
+  // Helper: parse signatory value which may be a number, string, JSON array string like '["1"]', or an array
+  const parseSignatoryValue = (val:any): string[] => {
+    if (val === undefined || val === null || val === '') return [];
+    if (Array.isArray(val)) return val.map(String).filter(Boolean);
+    if (typeof val === 'number') return [String(val)];
+    if (typeof val === 'string') {
+      // Try JSON parse (handles '["1"]' or '[1]')
+      try {
+        const p = JSON.parse(val);
+        if (Array.isArray(p)) return p.map(String).filter(Boolean);
+        if (typeof p === 'number' || typeof p === 'string') return [String(p)];
+      } catch (e) {
+        // not JSON
+      }
+      // Try extract first numeric id from string like '[1]' or '1'
+      const m = val.match(/\d+/);
+      if (m) return [m[0]];
+      // otherwise treat as manual name (no numeric ids)
+      return [];
+    }
+    return [];
+  };
+
+  // Helper: render signatory display using userNames cache when possible, fallback to manual string
+  const getSignatoryDisplay = (val:any): string => {
+    const ids = parseSignatoryValue(val);
+    if (ids.length) {
+      return ids.map(id => userNames[String(id)] || String(id)).join(', ');
+    }
+    // fallback to raw string (manual name)
+    if (val && typeof val === 'string') return val;
+    return '';
+  };
 
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -477,12 +514,12 @@ const PaymentVouchers: React.FC = () => {
                       // Resolve signatory names (prepared, reviewed, approved) if numeric and not cached
                       const idsToFetch = new Set<string>();
                       const maybe = (val:any) => (val !== undefined && val !== null) ? val : '';
-                      const rid = maybe(pv.reviewed_by) || maybe(pv.reviewed_by_manual) || '';
-                      const aid = maybe(pv.approved_by) || maybe(pv.approved_by_manual) || '';
-                      const pid = maybe(pv.prepared_by) || maybe(pv.prepared_by_manual) || '';
-                      if (rid && !isNaN(Number(rid)) && !userNames[String(rid)]) idsToFetch.add(String(rid));
-                      if (aid && !isNaN(Number(aid)) && !userNames[String(aid)]) idsToFetch.add(String(aid));
-                      if (pid && !isNaN(Number(pid)) && !userNames[String(pid)]) idsToFetch.add(String(pid));
+                      const ridVals = parseSignatoryValue(maybe(pv.reviewed_by) || maybe(pv.reviewed_by_manual) || '');
+                      const aidVals = parseSignatoryValue(maybe(pv.approved_by) || maybe(pv.approved_by_manual) || '');
+                      const pidVals = parseSignatoryValue(maybe(pv.prepared_by) || maybe(pv.prepared_by_manual) || '');
+                      for (const id of [...ridVals, ...aidVals, ...pidVals]) {
+                        if (id && !userNames[String(id)]) idsToFetch.add(String(id));
+                      }
 
                       // Fetch user names into a local map, then merge once into state (avoids race and ensures preview uses them)
                       const fetchedNames: Record<string,string> = {};
@@ -662,34 +699,9 @@ const PaymentVouchers: React.FC = () => {
           <Box sx={{mt:2, mb:2}}>
             <Box sx={{fontWeight:700, mb:1}}>SIGNATORIES</Box>
             <Box sx={{display:'grid', gridTemplateColumns: '1fr 1fr 1fr', gap:2}}>
-                <TextField label="Prepared By" value={(() => {
-                  // If editing and prepared_by numeric, prefer cached name, else use current user's full name
-                  const pid = form && form.prepared_by;
-                  if (pid && !isNaN(Number(pid))) return userNames[String(pid)] || String(pid);
-                  return user?.full_name || user?.username || '';
-                })()} disabled />
-                <TextField label="Reviewed By" value={(():any => {
-                  // Prefer explicitly set form value
-                  let v = form.reviewed_by;
-                  // fallback to current user's workflow settings if form not seeded
-                  if (!v) {
-                    const _u: User | null = user as User | null;
-                    v = (_u && _u.reviewer_id) ? _u.reviewer_id : (_u && _u.reviewer_manual ? _u.reviewer_manual : '');
-                  }
-                  if (!v) return '';
-                  if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
-                  return v || '';
-                })()} onChange={e => setForm({...form, reviewed_by: e.target.value})} />
-                <TextField label="Approved By" value={(():any => {
-                  let v = form.approved_by;
-                  if (!v) {
-                    const _u: User | null = user as User | null;
-                    v = (_u && _u.approver_id) ? _u.approver_id : (_u && _u.approver_manual ? _u.approver_manual : '');
-                  }
-                  if (!v) return '';
-                  if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
-                  return v || '';
-                })()} onChange={e => setForm({...form, approved_by: e.target.value})} />
+                <TextField label="Prepared By" value={getSignatoryDisplay(form.prepared_by || form.prepared_by_manual || user?.user_id)} disabled />
+                <TextField label="Reviewed By" value={getSignatoryDisplay(form.reviewed_by || form.reviewed_by_manual || (user && ((user as User).reviewer_id || (user as User).reviewer_manual)))} onChange={e => setForm({...form, reviewed_by: e.target.value})} />
+                <TextField label="Approved By" value={getSignatoryDisplay(form.approved_by || form.approved_by_manual || (user && ((user as User).approver_id || (user as User).approver_manual)))} onChange={e => setForm({...form, approved_by: e.target.value})} />
               </Box>
           </Box>
         </DialogContent>
@@ -797,32 +809,17 @@ const PaymentVouchers: React.FC = () => {
                   <div style={{textAlign:'center', width:'30%'}}>
                     <div style={{fontWeight:700}}>Prepared By</div>
                     <div style={{marginTop:24}}>__________________</div>
-                    <div style={{marginTop:8, fontSize:12}}>{(() => {
-                      const v = previewItem.prepared_by || previewItem.prepared_by_manual || '';
-                      if (!v) return '';
-                      if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
-                      return v || '';
-                    })()}</div>
+                    <div style={{marginTop:8, fontSize:12}}>{getSignatoryDisplay(previewItem.prepared_by || previewItem.prepared_by_manual || '')}</div>
                   </div>
                   <div style={{textAlign:'center', width:'30%'}}>
                     <div style={{fontWeight:700}}>Reviewed By</div>
                     <div style={{marginTop:24}}>__________________</div>
-                    <div style={{marginTop:8, fontSize:12}}>{(() => {
-                      const v = previewItem.reviewed_by || previewItem.reviewed_by_manual || '';
-                      if (!v) return '';
-                      if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
-                      return v || '';
-                    })()}</div>
+                    <div style={{marginTop:8, fontSize:12}}>{getSignatoryDisplay(previewItem.reviewed_by || previewItem.reviewed_by_manual || '')}</div>
                   </div>
                   <div style={{textAlign:'center', width:'30%'}}>
                     <div style={{fontWeight:700}}>Approved By</div>
                     <div style={{marginTop:24}}>__________________</div>
-                    <div style={{marginTop:8, fontSize:12}}>{(() => {
-                      const v = previewItem.approved_by || previewItem.approved_by_manual || '';
-                      if (!v) return '';
-                      if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
-                      return v || '';
-                    })()}</div>
+                    <div style={{marginTop:8, fontSize:12}}>{getSignatoryDisplay(previewItem.approved_by || previewItem.approved_by_manual || '')}</div>
                   </div>
                 </div>
               </div>
