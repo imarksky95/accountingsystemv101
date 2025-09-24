@@ -553,6 +553,59 @@ const PaymentVouchers: React.FC = () => {
 
                       // set enriched preview item so the dialog shows resolved COA and signatory names from cache
                       const enrichedPV = { ...pv, journal_lines: resolvedJournal };
+
+                      // If PV lacks explicit reviewer/approver, try fetching public users for those roles as a best-effort fallback
+                      try {
+                        const needReviewer = !(enrichedPV.reviewed_by || enrichedPV.reviewed_by_manual || enrichedPV.reviewed_by_name);
+                        const needApprover = !(enrichedPV.approved_by || enrichedPV.approved_by_manual || enrichedPV.approved_by_name);
+                        if (needReviewer) {
+                          try {
+                            const r = await axios.get(buildUrl('/api/users/public?role_type=reviewer'));
+                            if (r && Array.isArray(r.data) && r.data.length) {
+                              const u = r.data[0];
+                              if (u && (u.full_name || u.username)) {
+                                enrichedPV.reviewed_by_name = u.full_name || u.username || '';
+                                // also seed into fetchedNames
+                                if (u.user_id) fetchedNames[String(u.user_id)] = enrichedPV.reviewed_by_name;
+                              }
+                            }
+                          } catch (e) { /* ignore fallback */ }
+                        }
+                        if (needApprover) {
+                          try {
+                            const r2 = await axios.get(buildUrl('/api/users/public?role_type=approver'));
+                            if (r2 && Array.isArray(r2.data) && r2.data.length) {
+                              const u2 = r2.data[0];
+                              if (u2 && (u2.full_name || u2.username)) {
+                                enrichedPV.approved_by_name = u2.full_name || u2.username || '';
+                                if (u2.user_id) fetchedNames[String(u2.user_id)] = enrichedPV.approved_by_name;
+                              }
+                            }
+                          } catch (e) { /* ignore fallback */ }
+                        }
+                        // merge any additional fetchedNames into state
+                        if (Object.keys(fetchedNames).length) setUserNames(prev => ({ ...prev, ...fetchedNames }));
+                        // Ensure enrichedPV has prepared/reviewed/approved name fields populated from fetchedNames/userNames/manuals
+                        const ensureNameFor = (pvObj:any, fieldBase:string) => {
+                          const nameField = `${fieldBase}_by_name`;
+                          if (pvObj[nameField]) return;
+                          const manual = pvObj[`${fieldBase}_by_manual`] || pvObj[`${fieldBase}_by_name`] || '';
+                          if (manual) { pvObj[nameField] = manual; return; }
+                          // parse numeric ids from the PV field
+                          const vals = parseSignatoryValue(pvObj[fieldBase] || pvObj[`${fieldBase}_manual`] || '');
+                          if (vals && vals.length) {
+                            const sid = vals[0];
+                            if (fetchedNames[sid]) { pvObj[nameField] = fetchedNames[sid]; return; }
+                            if (userNames && userNames[sid]) { pvObj[nameField] = userNames[sid]; return; }
+                            // fallback to raw id string
+                            pvObj[nameField] = String(sid);
+                          }
+                        };
+                        ensureNameFor(enrichedPV, 'prepared');
+                        ensureNameFor(enrichedPV, 'reviewed');
+                        ensureNameFor(enrichedPV, 'approved');
+                      } catch (e) { /* ignore */ }
+
                       setPreviewItem(enrichedPV);
                     } catch (e) {
                       // ignore failures; preview will show fallback text
@@ -809,17 +862,17 @@ const PaymentVouchers: React.FC = () => {
                   <div style={{textAlign:'center', width:'30%'}}>
                     <div style={{fontWeight:700}}>Prepared By</div>
                     <div style={{marginTop:24}}>__________________</div>
-                    <div style={{marginTop:8, fontSize:12}}>{getSignatoryDisplay(previewItem.prepared_by || previewItem.prepared_by_manual || '')}</div>
+                    <div style={{marginTop:8, fontSize:12}}>{previewItem.prepared_by_name || getSignatoryDisplay(previewItem.prepared_by || previewItem.prepared_by_manual || '')}</div>
                   </div>
                   <div style={{textAlign:'center', width:'30%'}}>
                     <div style={{fontWeight:700}}>Reviewed By</div>
                     <div style={{marginTop:24}}>__________________</div>
-                    <div style={{marginTop:8, fontSize:12}}>{getSignatoryDisplay(previewItem.reviewed_by || previewItem.reviewed_by_manual || '')}</div>
+                    <div style={{marginTop:8, fontSize:12}}>{previewItem.reviewed_by_name || getSignatoryDisplay(previewItem.reviewed_by || previewItem.reviewed_by_manual || '')}</div>
                   </div>
                   <div style={{textAlign:'center', width:'30%'}}>
                     <div style={{fontWeight:700}}>Approved By</div>
                     <div style={{marginTop:24}}>__________________</div>
-                    <div style={{marginTop:8, fontSize:12}}>{getSignatoryDisplay(previewItem.approved_by || previewItem.approved_by_manual || '')}</div>
+                    <div style={{marginTop:8, fontSize:12}}>{previewItem.approved_by_name || getSignatoryDisplay(previewItem.approved_by || previewItem.approved_by_manual || '')}</div>
                   </div>
                 </div>
               </div>
