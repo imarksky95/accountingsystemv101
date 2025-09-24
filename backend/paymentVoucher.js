@@ -158,7 +158,37 @@ router.get('/', async (req, res) => {
         amount_to_pay = 0;
       }
 
-  out.push(Object.assign({}, pv, { payment_lines, journal_lines, payee_name, coa_name, amount_to_pay }));
+      // Resolve prepared/reviewed/approved names similar to the PDF endpoint
+      try {
+        const preparedId = pv.prepared_by || pv.prepared_by_manual || null;
+        const reviewedId = pv.reviewed_by || pv.reviewed_by_manual || null;
+        const approvedId = pv.approved_by || pv.approved_by_manual || null;
+        const signatoryIds = [];
+        if (preparedId && !isNaN(Number(preparedId))) signatoryIds.push(Number(preparedId));
+        if (reviewedId && !isNaN(Number(reviewedId))) signatoryIds.push(Number(reviewedId));
+        if (approvedId && !isNaN(Number(approvedId))) signatoryIds.push(Number(approvedId));
+        const signatoryMap = {};
+        if (signatoryIds.length) {
+          const ids = Array.from(new Set(signatoryIds));
+          const placeholders = ids.map(() => '?').join(',');
+          try {
+            const [users] = await db.execute(`SELECT user_id, COALESCE(full_name, username) AS full_name FROM users WHERE user_id IN (${placeholders})`, ids);
+            if (Array.isArray(users)) {
+              for (const u of users) signatoryMap[u.user_id] = u.full_name || String(u.user_id);
+            }
+          } catch (e) {
+            console.warn('Failed to resolve signatory names for PV list', pv.payment_voucher_id, e && e.message ? e.message : e);
+          }
+        }
+        const prepared_by_name = (!preparedId || isNaN(Number(preparedId))) ? (preparedId || '') : (signatoryMap[Number(preparedId)] || String(preparedId));
+        const reviewed_by_name = (!reviewedId || isNaN(Number(reviewedId))) ? (reviewedId || '') : (signatoryMap[Number(reviewedId)] || String(reviewedId));
+        const approved_by_name = (!approvedId || isNaN(Number(approvedId))) ? (approvedId || '') : (signatoryMap[Number(approvedId)] || String(approvedId));
+
+        out.push(Object.assign({}, pv, { payment_lines, journal_lines, payee_name, coa_name, amount_to_pay, prepared_by_name, reviewed_by_name, approved_by_name }));
+      } catch (e) {
+        // if signatory resolution fails, still return the PV with the fields we have
+        out.push(Object.assign({}, pv, { payment_lines, journal_lines, payee_name, coa_name, amount_to_pay }));
+      }
     }
     res.json(out);
   } catch (err) {

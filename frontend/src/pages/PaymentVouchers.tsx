@@ -466,7 +466,6 @@ const PaymentVouchers: React.FC = () => {
                   <Button size="small" onClick={() => openEdit(pv)} sx={{mr:1}}>Edit</Button>
                   <Button size="small" color="error" onClick={() => confirmDelete(pv.payment_voucher_id)} sx={{mr:1}}>Delete</Button>
                   <Button size="small" onClick={async () => {
-                    setPreviewItem(pv);
                     try {
                       if (!companyProfile) {
                         const r = await tryFetchWithFallback('/api/company-profile', { cache: 'no-store' });
@@ -484,17 +483,43 @@ const PaymentVouchers: React.FC = () => {
                       if (rid && !isNaN(Number(rid)) && !userNames[String(rid)]) idsToFetch.add(String(rid));
                       if (aid && !isNaN(Number(aid)) && !userNames[String(aid)]) idsToFetch.add(String(aid));
                       if (pid && !isNaN(Number(pid)) && !userNames[String(pid)]) idsToFetch.add(String(pid));
+
+                      // Fetch user names into a local map, then merge once into state (avoids race and ensures preview uses them)
+                      const fetchedNames: Record<string,string> = {};
                       if (idsToFetch.size) {
                         const token = localStorage.getItem('token');
                         await Promise.all(Array.from(idsToFetch).map(async id => {
                           try {
                             const r = await axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-                            if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id }));
-                          } catch (e) {}
+                            if (r && r.data) fetchedNames[id] = r.data.full_name || r.data.username || id;
+                          } catch (e) {
+                            // ignore individual failures
+                          }
                         }));
                       }
+
+                      // Resolve COA account_name for journal lines using local `coas` cache when missing
+                      const resolvedJournal = (pv.journal_lines || []).map((j:any) => {
+                        const copy = { ...j };
+                        if (!copy.account_name) {
+                          const cid = copy.coa_id || copy.coa;
+                          if (cid !== undefined && cid !== null && coas && coas.length) {
+                            const found = coas.find((c:any) => String(c.coa_id) === String(cid) || String(c.coa_id) === String((copy.coa_id || '')));
+                            if (found) copy.account_name = found.account_name || found.name || '';
+                          }
+                        }
+                        return copy;
+                      });
+
+                      // merge fetched names into userNames state once
+                      if (Object.keys(fetchedNames).length) setUserNames(prev => ({ ...prev, ...fetchedNames }));
+
+                      // set enriched preview item so the dialog shows resolved COA and signatory names from cache
+                      const enrichedPV = { ...pv, journal_lines: resolvedJournal };
+                      setPreviewItem(enrichedPV);
                     } catch (e) {
                       // ignore failures; preview will show fallback text
+                      setPreviewItem(pv);
                     }
                     setPreviewOpen(true);
                   }}>Preview</Button>
