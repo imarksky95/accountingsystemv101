@@ -1,0 +1,13 @@
+nohup: ignoring input
+[dotenv@17.2.2] injecting env (5) from .env -- tip: 📡 auto-backup env with Radar: https://dotenvx.com/radar
+Server running on port 5000
+Failed to resolve account names for PV journal lines 2 Unknown column 'name' in 'SELECT'
+Failed to resolve coa_name for PV 2 Unknown column 'name' in 'SELECT'
+Failed to resolve account names for PV journal lines 2 Unknown column 'name' in 'SELECT'
+Failed to resolve coa_name for PV 2 Unknown column 'name' in 'SELECT'
+Failed to resolve COA names for journal lines for PV 2 Unknown column 'name' in 'SELECT'
+Failed to resolve COA name for PV 2 Unknown column 'name' in 'SELECT'
+Failed to resolve COA names for journal lines for PV 1 Unknown column 'name' in 'SELECT'
+Failed to resolve COA name for PV 1 Unknown column 'name' in 'SELECT'
+Failed to resolve account names for PV journal lines 3 Unknown column 'name' in 'SELECT'
+Failed to resolve coa_name for PV 3 Unknown column 'name' in 'SELECT'

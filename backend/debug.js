@@ -21,6 +21,8 @@ router.get('/pv-status', async (req, res) => {
   }
 });
 
+// debug routes removed
+
 // Expose last login timing info (in-memory)
 let lastLoginTiming = null;
 router.get('/last-login', (req, res) => {

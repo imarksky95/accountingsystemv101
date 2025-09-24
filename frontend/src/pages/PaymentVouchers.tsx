@@ -335,7 +335,7 @@ const PaymentVouchers: React.FC = () => {
     } catch (e) {}
     setOpen(true);
   };
-  interface PVItem { payment_voucher_id?: number; payment_voucher_control?: string; payment_lines?: PaymentLine[]; journal_lines?: JournalLine[]; reviewed_by?: number | string; reviewed_by_manual?: string; approved_by?: number | string; approved_by_manual?: string; prepared_by?: number | string; preparation_date?: string | null }
+  interface PVItem { payment_voucher_id?: number; payment_voucher_control?: string; payment_lines?: PaymentLine[]; journal_lines?: JournalLine[]; reviewer_id?: number | string; reviewer_manual?: string; approver_id?: number | string; approver_manual?: string; reviewed_by?: number | string; reviewed_by_manual?: string; approved_by?: number | string; approved_by_manual?: string; prepared_by?: number | string; preparation_date?: string | null }
   const openEdit = async (pv: PVItem) => {
     await Promise.all([fetchContacts(), fetchCoas()]);
     setEditing(pv);
@@ -345,16 +345,16 @@ const PaymentVouchers: React.FC = () => {
       preparation_date: pv.preparation_date && typeof pv.preparation_date === 'string' && pv.preparation_date.indexOf('T') !== -1 ? pv.preparation_date.slice(0,10) : pv.preparation_date,
       payment_lines: pv.payment_lines && pv.payment_lines.length ? pv.payment_lines.map((pl:any) => ({ payee_id: pl.payee_contact_id ? String(pl.payee_contact_id) : (pl.payee_id || ''), payee_name: pl.payee_display || pl.payee_name || '', description: pl.description || '', amount: pl.amount || 0 })) : [{ payee_id: '', description: '', amount: 0 }],
       journal_lines: pv.journal_lines && pv.journal_lines.length ? pv.journal_lines : [{ coa_id: '', debit: 0, credit: 0, remarks: '' }],
-      reviewed_by: pv.reviewed_by || pv.reviewed_by_manual || '',
-      approved_by: pv.approved_by || pv.approved_by_manual || ''
+      reviewed_by: pv.reviewer_id || pv.reviewer_manual || pv.reviewed_by || pv.reviewed_by_manual || '',
+      approved_by: pv.approver_id || pv.approver_manual || pv.approved_by || pv.approved_by_manual || ''
     });
     setOpen(true);
     // Resolve prepared_by, reviewer, and approver numeric IDs to full_name (seed userNames cache)
     try {
       const token = localStorage.getItem('token');
       const idsToResolve: string[] = [];
-      const rid = pv.reviewed_by || pv.reviewed_by_manual || '';
-      const aid = pv.approved_by || pv.approved_by_manual || '';
+  const rid = pv.reviewer_id || pv.reviewer_manual || pv.reviewed_by || pv.reviewed_by_manual || '';
+  const aid = pv.approver_id || pv.approver_manual || pv.approved_by || pv.approved_by_manual || '';
       const pid = pv.prepared_by || '';
       if (rid && !isNaN(Number(rid))) idsToResolve.push(String(rid));
       if (aid && !isNaN(Number(aid))) idsToResolve.push(String(aid));
@@ -504,6 +504,7 @@ const PaymentVouchers: React.FC = () => {
                   <Button size="small" color="error" onClick={() => confirmDelete(pv.payment_voucher_id)} sx={{mr:1}}>Delete</Button>
                   <Button size="small" onClick={async () => {
                     try {
+                      // Ensure company profile is available
                       if (!companyProfile) {
                         const r = await tryFetchWithFallback('/api/company-profile', { cache: 'no-store' });
                         if (r.ok) {
@@ -511,32 +512,24 @@ const PaymentVouchers: React.FC = () => {
                           setCompanyProfile(d);
                         }
                       }
-                      // Resolve signatory names (prepared, reviewed, approved) if numeric and not cached
-                      const idsToFetch = new Set<string>();
-                      const maybe = (val:any) => (val !== undefined && val !== null) ? val : '';
-                      const ridVals = parseSignatoryValue(maybe(pv.reviewed_by) || maybe(pv.reviewed_by_manual) || '');
-                      const aidVals = parseSignatoryValue(maybe(pv.approved_by) || maybe(pv.approved_by_manual) || '');
-                      const pidVals = parseSignatoryValue(maybe(pv.prepared_by) || maybe(pv.prepared_by_manual) || '');
-                      for (const id of [...ridVals, ...aidVals, ...pidVals]) {
-                        if (id && !userNames[String(id)]) idsToFetch.add(String(id));
+
+                      // First try to fetch the server-enriched single PV which should include
+                      // prepared_by_name, reviewed_by_name, approved_by_name and account_name on journal lines.
+                      let serverPV: any = null;
+                      try {
+                        const token = localStorage.getItem('token');
+                        const resp = await axios.get(buildUrl(`/api/payment-vouchers/${pv.payment_voucher_id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+                        if (resp && resp.data) serverPV = resp.data;
+                      } catch (e) {
+                        // server fetch failed; we'll fallback to local enrichment below
+                        serverPV = null;
                       }
 
-                      // Fetch user names into a local map, then merge once into state (avoids race and ensures preview uses them)
-                      const fetchedNames: Record<string,string> = {};
-                      if (idsToFetch.size) {
-                        const token = localStorage.getItem('token');
-                        await Promise.all(Array.from(idsToFetch).map(async id => {
-                          try {
-                            const r = await axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-                            if (r && r.data) fetchedNames[id] = r.data.full_name || r.data.username || id;
-                          } catch (e) {
-                            // ignore individual failures
-                          }
-                        }));
-                      }
+                      // If server provided an enriched PV, prefer it as the base for preview
+                      const basePV = serverPV || pv;
 
                       // Resolve COA account_name for journal lines using local `coas` cache when missing
-                      const resolvedJournal = (pv.journal_lines || []).map((j:any) => {
+                      const resolvedJournal = (basePV.journal_lines || []).map((j:any) => {
                         const copy = { ...j };
                         if (!copy.account_name) {
                           const cid = copy.coa_id || copy.coa;
@@ -548,68 +541,59 @@ const PaymentVouchers: React.FC = () => {
                         return copy;
                       });
 
-                      // merge fetched names into userNames state once
-                      if (Object.keys(fetchedNames).length) setUserNames(prev => ({ ...prev, ...fetchedNames }));
+                      const enrichedPV = { ...basePV, journal_lines: resolvedJournal };
 
-                      // set enriched preview item so the dialog shows resolved COA and signatory names from cache
-                      const enrichedPV = { ...pv, journal_lines: resolvedJournal };
-
-                      // If PV lacks explicit reviewer/approver, try fetching public users for those roles as a best-effort fallback
+                      // If server did not provide signatory names, fetch numeric user names as needed
+                      const fetchedNames: Record<string,string> = {};
                       try {
-                        const needReviewer = !(enrichedPV.reviewed_by || enrichedPV.reviewed_by_manual || enrichedPV.reviewed_by_name);
-                        const needApprover = !(enrichedPV.approved_by || enrichedPV.approved_by_manual || enrichedPV.approved_by_name);
-                        if (needReviewer) {
-                          try {
-                            const r = await axios.get(buildUrl('/api/users/public?role_type=reviewer'));
-                            if (r && Array.isArray(r.data) && r.data.length) {
-                              const u = r.data[0];
-                              if (u && (u.full_name || u.username)) {
-                                enrichedPV.reviewed_by_name = u.full_name || u.username || '';
-                                // also seed into fetchedNames
-                                if (u.user_id) fetchedNames[String(u.user_id)] = enrichedPV.reviewed_by_name;
-                              }
-                            }
-                          } catch (e) { /* ignore fallback */ }
+                        const maybe = (val:any) => (val !== undefined && val !== null) ? val : '';
+                        const ridVals = parseSignatoryValue(maybe(enrichedPV.reviewer_id) || maybe(enrichedPV.reviewer_manual) || maybe(enrichedPV.reviewed_by) || maybe(enrichedPV.reviewed_by_manual) || '');
+                        const aidVals = parseSignatoryValue(maybe(enrichedPV.approver_id) || maybe(enrichedPV.approver_manual) || maybe(enrichedPV.approved_by) || maybe(enrichedPV.approved_by_manual) || '');
+                        const pidVals = parseSignatoryValue(maybe(enrichedPV.prepared_by) || maybe(enrichedPV.prepared_by_manual) || '');
+                        const idsToFetch = new Set<string>();
+                        for (const id of [...ridVals, ...aidVals, ...pidVals]) {
+                          if (id && !userNames[String(id)]) idsToFetch.add(String(id));
                         }
-                        if (needApprover) {
-                          try {
-                            const r2 = await axios.get(buildUrl('/api/users/public?role_type=approver'));
-                            if (r2 && Array.isArray(r2.data) && r2.data.length) {
-                              const u2 = r2.data[0];
-                              if (u2 && (u2.full_name || u2.username)) {
-                                enrichedPV.approved_by_name = u2.full_name || u2.username || '';
-                                if (u2.user_id) fetchedNames[String(u2.user_id)] = enrichedPV.approved_by_name;
-                              }
+                        if (idsToFetch.size) {
+                          const token = localStorage.getItem('token');
+                          await Promise.all(Array.from(idsToFetch).map(async id => {
+                            try {
+                              const r = await axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+                              if (r && r.data) fetchedNames[id] = r.data.full_name || r.data.username || id;
+                            } catch (e) {
+                              // ignore
                             }
-                          } catch (e) { /* ignore fallback */ }
+                          }));
+                          if (Object.keys(fetchedNames).length) setUserNames(prev => ({ ...prev, ...fetchedNames }));
                         }
-                        // merge any additional fetchedNames into state
-                        if (Object.keys(fetchedNames).length) setUserNames(prev => ({ ...prev, ...fetchedNames }));
-                        // Ensure enrichedPV has prepared/reviewed/approved name fields populated from fetchedNames/userNames/manuals
-                        const ensureNameFor = (pvObj:any, fieldBase:string) => {
-                          const nameField = `${fieldBase}_by_name`;
-                          if (pvObj[nameField]) return;
-                          const manual = pvObj[`${fieldBase}_by_manual`] || pvObj[`${fieldBase}_by_name`] || '';
-                          if (manual) { pvObj[nameField] = manual; return; }
-                          // parse numeric ids from the PV field
-                          const vals = parseSignatoryValue(pvObj[fieldBase] || pvObj[`${fieldBase}_manual`] || '');
-                          if (vals && vals.length) {
-                            const sid = vals[0];
-                            if (fetchedNames[sid]) { pvObj[nameField] = fetchedNames[sid]; return; }
-                            if (userNames && userNames[sid]) { pvObj[nameField] = userNames[sid]; return; }
-                            // fallback to raw id string
-                            pvObj[nameField] = String(sid);
-                          }
-                        };
-                        ensureNameFor(enrichedPV, 'prepared');
-                        ensureNameFor(enrichedPV, 'reviewed');
-                        ensureNameFor(enrichedPV, 'approved');
                       } catch (e) { /* ignore */ }
+
+                      // Ensure reviewed_by_name and approved_by_name are present, preferring server values
+                      if (!enrichedPV.prepared_by_name) {
+                        const vals = parseSignatoryValue(enrichedPV.prepared_by || enrichedPV.prepared_by_manual || '');
+                        if (vals && vals.length) enrichedPV.prepared_by_name = userNames[vals[0]] || fetchedNames[vals[0]] || String(vals[0]);
+                        else enrichedPV.prepared_by_name = enrichedPV.prepared_by_manual || '';
+                      }
+                      if (!enrichedPV.reviewed_by_name) {
+                        const vals = parseSignatoryValue(enrichedPV.reviewer_id || enrichedPV.reviewer_manual || enrichedPV.reviewed_by || enrichedPV.reviewed_by_manual || '');
+                        if (vals && vals.length) enrichedPV.reviewed_by_name = userNames[vals[0]] || fetchedNames[vals[0]] || String(vals[0]);
+                        else enrichedPV.reviewed_by_name = enrichedPV.reviewer_manual || enrichedPV.reviewed_by_manual || '';
+                      }
+                      if (!enrichedPV.approved_by_name) {
+                        const vals = parseSignatoryValue(enrichedPV.approver_id || enrichedPV.approver_manual || enrichedPV.approved_by || enrichedPV.approved_by_manual || '');
+                        if (vals && vals.length) enrichedPV.approved_by_name = userNames[vals[0]] || fetchedNames[vals[0]] || String(vals[0]);
+                        else enrichedPV.approved_by_name = enrichedPV.approver_manual || enrichedPV.approved_by_manual || '';
+                      }
+
+                      // Expose the server-provided source flags on the enriched item so the UI can show where names came from
+                      // (server returns `reviewerSource` and `approverSource` when available)
+                      if (basePV && basePV.reviewerSource) enrichedPV.reviewerSource = basePV.reviewerSource;
+                      if (basePV && basePV.approverSource) enrichedPV.approverSource = basePV.approverSource;
 
                       setPreviewItem(enrichedPV);
                     } catch (e) {
-                      // ignore failures; preview will show fallback text
-                      setPreviewItem(pv);
+                      // fallback to original PV if anything goes wrong
+                      try { setPreviewItem(pv); } catch (ex) { setPreviewItem(null); }
                     }
                     setPreviewOpen(true);
                   }}>Preview</Button>
@@ -778,6 +762,21 @@ const PaymentVouchers: React.FC = () => {
               return { payee_contact_id: contactId ? Number(contactId) : null, payee_display: display, description: l.description, amount: Number(l.amount) };
             });
 
+            // Determine reviewer/approver numeric vs manual
+            const determineSignatory = (val:any) => {
+              if (val === undefined || val === null || val === '') return { id: null, manual: null };
+              if (!isNaN(Number(val))) return { id: Number(val), manual: null };
+              // if value looks like JSON array with numeric id
+              try {
+                const p = JSON.parse(val);
+                if (Array.isArray(p) && p.length && !isNaN(Number(p[0]))) return { id: Number(p[0]), manual: null };
+              } catch (e) {}
+              return { id: null, manual: String(val) };
+            };
+
+            const reviewerSpec = determineSignatory(form.reviewed_by || form.reviewed_by_manual || '');
+            const approverSpec = determineSignatory(form.approved_by || form.approved_by_manual || '');
+
             const payload = {
               status: form.status || 'Draft',
               preparation_date: form.preparation_date,
@@ -787,8 +786,11 @@ const PaymentVouchers: React.FC = () => {
               description: form.description || '',
               payment_lines: mappedPaymentLines,
               journal_lines: (form.journal_lines || []).map((l:any) => ({ coa_id: l.coa_id || null, debit: Number(l.debit)||0, credit: Number(l.credit)||0, remarks: l.remarks || '' })),
-              reviewed_by: form.reviewed_by,
-              approved_by: form.approved_by
+              // include both id/manual variants and let backend persist whichever is provided
+              reviewer_id: reviewerSpec.id,
+              reviewer_manual: reviewerSpec.manual,
+              approver_id: approverSpec.id,
+              approver_manual: approverSpec.manual
             };
             try {
               const token = localStorage.getItem('token');
@@ -868,11 +870,13 @@ const PaymentVouchers: React.FC = () => {
                     <div style={{fontWeight:700}}>Reviewed By</div>
                     <div style={{marginTop:24}}>__________________</div>
                     <div style={{marginTop:8, fontSize:12}}>{previewItem.reviewed_by_name || getSignatoryDisplay(previewItem.reviewed_by || previewItem.reviewed_by_manual || '')}</div>
+                    <div style={{marginTop:6, fontSize:11, color:'#666'}}>{previewItem.reviewerSource === 'pv' ? 'Source: PV' : (previewItem.reviewerSource === 'preparer_workflow' ? 'Source: Preparer Workflow' : '')}</div>
                   </div>
                   <div style={{textAlign:'center', width:'30%'}}>
                     <div style={{fontWeight:700}}>Approved By</div>
                     <div style={{marginTop:24}}>__________________</div>
                     <div style={{marginTop:8, fontSize:12}}>{previewItem.approved_by_name || getSignatoryDisplay(previewItem.approved_by || previewItem.approved_by_manual || '')}</div>
+                    <div style={{marginTop:6, fontSize:11, color:'#666'}}>{previewItem.approverSource === 'pv' ? 'Source: PV' : (previewItem.approverSource === 'preparer_workflow' ? 'Source: Preparer Workflow' : '')}</div>
                   </div>
                 </div>
               </div>
