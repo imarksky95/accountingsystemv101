@@ -340,31 +340,42 @@ const PaymentVouchers: React.FC = () => {
     await Promise.all([fetchContacts(), fetchCoas()]);
     setEditing(pv);
     setExpectedControl(pv.payment_voucher_control || '');
+
+    // Determine reviewer/approver values: prefer PV-level fields; if missing, fall back to current user's workflow so the form is actually filled
+    const pvReviewer = pv.reviewer_id || pv.reviewer_manual || pv.reviewed_by || pv.reviewed_by_manual || '';
+    const pvApprover = pv.approver_id || pv.approver_manual || pv.approved_by || pv.approved_by_manual || '';
+    const reviewerValue = pvReviewer || (user && ((user as User).reviewer_id || (user as User).reviewer_manual)) || '';
+    const approverValue = pvApprover || (user && ((user as User).approver_id || (user as User).approver_manual)) || '';
+
     setForm({
       ...pv,
       preparation_date: pv.preparation_date && typeof pv.preparation_date === 'string' && pv.preparation_date.indexOf('T') !== -1 ? pv.preparation_date.slice(0,10) : pv.preparation_date,
       payment_lines: pv.payment_lines && pv.payment_lines.length ? pv.payment_lines.map((pl:any) => ({ payee_id: pl.payee_contact_id ? String(pl.payee_contact_id) : (pl.payee_id || ''), payee_name: pl.payee_display || pl.payee_name || '', description: pl.description || '', amount: pl.amount || 0 })) : [{ payee_id: '', description: '', amount: 0 }],
       journal_lines: pv.journal_lines && pv.journal_lines.length ? pv.journal_lines : [{ coa_id: '', debit: 0, credit: 0, remarks: '' }],
-      reviewed_by: pv.reviewer_id || pv.reviewer_manual || pv.reviewed_by || pv.reviewed_by_manual || '',
-      approved_by: pv.approver_id || pv.approver_manual || pv.approved_by || pv.approved_by_manual || ''
+      reviewed_by: reviewerValue,
+      approved_by: approverValue
     });
-    setOpen(true);
-    // Resolve prepared_by, reviewer, and approver numeric IDs to full_name (seed userNames cache)
+    // Seed userNames cache for the values we've set so the displayed labels show full names when possible
     try {
       const token = localStorage.getItem('token');
       const idsToResolve: string[] = [];
-  const rid = pv.reviewer_id || pv.reviewer_manual || pv.reviewed_by || pv.reviewed_by_manual || '';
-  const aid = pv.approver_id || pv.approver_manual || pv.approved_by || pv.approved_by_manual || '';
+      const rid = reviewerValue || '';
+      const aid = approverValue || '';
       const pid = pv.prepared_by || '';
       if (rid && !isNaN(Number(rid))) idsToResolve.push(String(rid));
       if (aid && !isNaN(Number(aid))) idsToResolve.push(String(aid));
       if (pid && !isNaN(Number(pid))) idsToResolve.push(String(pid));
-      for (const id of Array.from(new Set(idsToResolve))) {
-        axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-          .then(r => { if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id })); })
-          .catch(() => { /* ignore */ });
+      if (idsToResolve.length) {
+        await Promise.all(Array.from(new Set(idsToResolve)).map(async id => {
+          try {
+            const r = await axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+            if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id }));
+          } catch (e) { /* ignore individual failures */ }
+        }));
       }
     } catch (e) {}
+
+    setOpen(true);
   };
 
   // Prefetch data on mount for the overview and dialog selects
@@ -870,13 +881,11 @@ const PaymentVouchers: React.FC = () => {
                     <div style={{fontWeight:700}}>Reviewed By</div>
                     <div style={{marginTop:24}}>__________________</div>
                     <div style={{marginTop:8, fontSize:12}}>{previewItem.reviewed_by_name || getSignatoryDisplay(previewItem.reviewed_by || previewItem.reviewed_by_manual || '')}</div>
-                    <div style={{marginTop:6, fontSize:11, color:'#666'}}>{previewItem.reviewerSource === 'pv' ? 'Source: PV' : (previewItem.reviewerSource === 'preparer_workflow' ? 'Source: Preparer Workflow' : '')}</div>
                   </div>
                   <div style={{textAlign:'center', width:'30%'}}>
                     <div style={{fontWeight:700}}>Approved By</div>
                     <div style={{marginTop:24}}>__________________</div>
                     <div style={{marginTop:8, fontSize:12}}>{previewItem.approved_by_name || getSignatoryDisplay(previewItem.approved_by || previewItem.approved_by_manual || '')}</div>
-                    <div style={{marginTop:6, fontSize:11, color:'#666'}}>{previewItem.approverSource === 'pv' ? 'Source: PV' : (previewItem.approverSource === 'preparer_workflow' ? 'Source: Preparer Workflow' : '')}</div>
                   </div>
                 </div>
               </div>
