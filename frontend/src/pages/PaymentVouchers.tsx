@@ -475,6 +475,24 @@ const PaymentVouchers: React.FC = () => {
                           setCompanyProfile(d);
                         }
                       }
+                      // Resolve signatory names (prepared, reviewed, approved) if numeric and not cached
+                      const idsToFetch = new Set<string>();
+                      const maybe = (val:any) => (val !== undefined && val !== null) ? val : '';
+                      const rid = maybe(pv.reviewed_by) || maybe(pv.reviewed_by_manual) || '';
+                      const aid = maybe(pv.approved_by) || maybe(pv.approved_by_manual) || '';
+                      const pid = maybe(pv.prepared_by) || maybe(pv.prepared_by_manual) || '';
+                      if (rid && !isNaN(Number(rid)) && !userNames[String(rid)]) idsToFetch.add(String(rid));
+                      if (aid && !isNaN(Number(aid)) && !userNames[String(aid)]) idsToFetch.add(String(aid));
+                      if (pid && !isNaN(Number(pid)) && !userNames[String(pid)]) idsToFetch.add(String(pid));
+                      if (idsToFetch.size) {
+                        const token = localStorage.getItem('token');
+                        await Promise.all(Array.from(idsToFetch).map(async id => {
+                          try {
+                            const r = await axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+                            if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id }));
+                          } catch (e) {}
+                        }));
+                      }
                     } catch (e) {
                       // ignore failures; preview will show fallback text
                     }
