@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import { UserContext } from './UserContext';
 
 import DashboardLayout from './components/DashboardLayout';
+import Dashboard from './pages/Dashboard';
 import BankingManagement from './pages/BankingManagement';
 import APManagement from './pages/APManagement';
 import ARManagement from './pages/ARManagement';
@@ -15,10 +16,7 @@ import Payroll from './pages/Payroll';
 import Settings from './pages/Settings';
 import UsersAndRoleSettings from './pages/UsersAndRoleSettings';
 
-const Dashboard = () => {
-  const { user } = useContext(UserContext);
-  return <div>Welcome, {user?.username || 'User'}! This is your dashboard.</div>;
-};
+// ...existing code... (dashboard page moved to ./pages/Dashboard)
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const { user } = useContext(UserContext);
@@ -32,8 +30,9 @@ function App() {
     <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route
-          path="/"
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <DashboardLayout>

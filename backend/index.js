@@ -371,6 +371,45 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend is working!' });
 });
 
+// Dashboard summary endpoint - returns small set of aggregates useful for dashboard widgets
+app.get('/api/dashboard/summary', async (req, res, next) => {
+  try {
+    const pool = app.get('dbPool');
+    // 1) Cash in bank: sum of balances from a bank_accounts table if present, else derive from payment_vouchers
+    let cashInBank = 0;
+    try {
+      const [rows] = await pool.execute('SELECT SUM(balance) AS total FROM bank_accounts');
+      if (rows && rows[0] && rows[0].total != null) cashInBank = Number(rows[0].total) || 0;
+    } catch (e) {
+      // fallback: sum of unreconciled inflows - outflows over recent payments (best effort)
+      const [inRows] = await pool.execute("SELECT IFNULL(SUM(amount_to_pay),0) AS inflow FROM payment_vouchers WHERE status = 'paid'");
+      cashInBank = Number((inRows && inRows[0] && inRows[0].inflow) ? inRows[0].inflow : 0);
+    }
+
+    // 2) Recent cashflow points: last 8 days aggregated by day from payment_vouchers (payments and receipts)
+    const [pointsRows] = await pool.execute(`
+      SELECT DATE(created_at) AS dt,
+        SUM(CASE WHEN amount_to_pay >= 0 THEN amount_to_pay ELSE 0 END) AS outflow,
+        SUM(CASE WHEN amount_to_pay < 0 THEN ABS(amount_to_pay) ELSE 0 END) AS inflow
+      FROM payment_vouchers
+      WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+      GROUP BY DATE(created_at)
+      ORDER BY DATE(created_at) ASC
+      LIMIT 30
+    `);
+
+    // 3) Highlights: simple counts
+    const [[{ open_pvs = 0 }], [{ vendors_count = 0 }]] = await Promise.all([
+      pool.execute("SELECT COUNT(*) AS open_pvs FROM payment_vouchers WHERE status IN ('draft','pending')"),
+      pool.execute("SELECT COUNT(*) AS vendors_count FROM vendors")
+    ]).then(results => results.map(r => r[0]));
+
+    res.json({ cashInBank, points: pointsRows || [], highlights: { openPaymentVouchers: Number(open_pvs || 0), vendorsCount: Number(vendors_count || 0) } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.get('/', (req, res) => {
   res.send('Accounting System Backend API');
 });

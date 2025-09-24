@@ -2,6 +2,7 @@
 import React, { useContext, useState } from 'react';
 import { Box, CssBaseline, Drawer, AppBar, Toolbar, Typography, List, ListItem, ListItemIcon, ListItemText, Avatar, ListItemButton, IconButton, Tooltip } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import HomeIcon from '@mui/icons-material/Home';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import PaymentIcon from '@mui/icons-material/Payment';
 import ReceiptIcon from '@mui/icons-material/Receipt';
@@ -16,6 +17,7 @@ import { useCompany } from '../CompanyContext';
 const drawerWidth = 240;
 
 const navItems = [
+  { text: 'Dashboard', icon: <HomeIcon />, path: '/dashboard' },
   { text: 'Banking Management', icon: <AccountBalanceIcon />, path: '/banking' },
   { text: 'AP Management', icon: <PaymentIcon />, path: '/ap' },
   { text: 'AR Management', icon: <ReceiptIcon />, path: '/ar' },

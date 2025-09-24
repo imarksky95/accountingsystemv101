@@ -19,8 +19,8 @@ const Login: React.FC = () => {
     try {
       const res = await login(username, password);
       const { token, user } = res.data;
-      loginUser(user, token); // set user and token in context/localStorage
-      navigate('/');
+  loginUser(user, token); // set user and token in context/localStorage
+  navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed');
     }
