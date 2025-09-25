@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[112],{4112:(e,r,l)=>{l.r(r),l.d(r,{default:()=>o});l(5043);var n=l(6446),a=l(5865),d=l(579);const o=()=>(0,d.jsxs)(n.A,{p:2,children:[(0,d.jsx)(a.A,{variant:"h5",children:"Payroll Module"}),(0,d.jsx)(a.A,{variant:"body1",color:"textSecondary",children:"Payroll features will be added here soon."})]})}}]);
+//# sourceMappingURL=112.00ea0a73.chunk.js.map

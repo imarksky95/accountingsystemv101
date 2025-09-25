@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[648],{2648:(e,n,a)=>{a.r(n),a.d(n,{default:()=>t});a(5043);var s=a(579);const t=()=>(0,s.jsx)("h2",{children:"Banking Management Module"})}}]);
+//# sourceMappingURL=648.c243aa50.chunk.js.map

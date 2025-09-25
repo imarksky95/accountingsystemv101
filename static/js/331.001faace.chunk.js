@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[331],{1331:(e,n,s)=>{s.r(n),s.d(n,{default:()=>a});s(5043);var t=s(579);const a=()=>(0,t.jsx)("h2",{children:"AR Management Module"})}}]);
+//# sourceMappingURL=331.001faace.chunk.js.map
