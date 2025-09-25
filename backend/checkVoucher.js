@@ -36,6 +36,14 @@ router.post('/', async (req, res) => {
   const dbPool = getDbPool(req);
   let conn;
   try {
+    // Basic server-side validation to avoid inconsistent data
+    if (!purpose) return res.status(400).json({ error: 'Purpose is required' });
+    if (!Array.isArray(payment_lines) || payment_lines.length === 0) return res.status(400).json({ error: 'At least one payment line is required' });
+    if (!Array.isArray(journal_lines) || journal_lines.length < 2) return res.status(400).json({ error: 'At least two journal lines are required' });
+    const totalDebit = (journal_lines || []).reduce((s, j) => s + (Number(j.debit) || 0), 0);
+    const totalCredit = (journal_lines || []).reduce((s, j) => s + (Number(j.credit) || 0), 0);
+    if (totalDebit !== totalCredit) return res.status(400).json({ error: 'Total debit and credit must be equal' });
+
     conn = await dbPool.getConnection();
     await conn.beginTransaction();
 
@@ -114,6 +122,14 @@ router.put('/:id', async (req, res) => {
   const dbPool = getDbPool(req);
   let conn;
   try {
+    // Server-side validation
+    if (!purpose) return res.status(400).json({ error: 'Purpose is required' });
+    if (!Array.isArray(payment_lines) || payment_lines.length === 0) return res.status(400).json({ error: 'At least one payment line is required' });
+    if (!Array.isArray(journal_lines) || journal_lines.length < 2) return res.status(400).json({ error: 'At least two journal lines are required' });
+    const totalDebit = (journal_lines || []).reduce((s, j) => s + (Number(j.debit) || 0), 0);
+    const totalCredit = (journal_lines || []).reduce((s, j) => s + (Number(j.credit) || 0), 0);
+    if (totalDebit !== totalCredit) return res.status(400).json({ error: 'Total debit and credit must be equal' });
+
     conn = await dbPool.getConnection();
     await conn.beginTransaction();
 
