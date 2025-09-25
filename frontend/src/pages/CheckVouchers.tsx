@@ -22,8 +22,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 
 import { tryFetchWithFallback } from '../apiBase';
 
-type PaymentLine = { payee?: string; amount?: number | '' };
-type CheckLine = { check_date?: string; check_no?: string; payee?: string; amount?: number | '' };
+type PaymentLine = { payee?: string; amount?: number | ''; payee_contact_id?: number | null };
+type CheckLine = { check_date?: string; check_no?: string; payee?: string; amount?: number | ''; check_subpayee?: number | null };
 
 const emptyPaymentLine = (): PaymentLine => ({ payee: '', amount: '' });
 const emptyCheckLine = (): CheckLine => ({ check_date: '', check_no: '', payee: '', amount: '' });
@@ -31,6 +31,8 @@ const emptyCheckLine = (): CheckLine => ({ check_date: '', check_no: '', payee: 
 const CheckVouchers: React.FC = () => {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [coas, setCoas] = useState<any[]>([]);
 
   // Form state
   const [type, setType] = useState<'single' | 'multi'>('single');
@@ -54,6 +56,10 @@ const CheckVouchers: React.FC = () => {
   };
 
   useEffect(() => { fetchList(); }, []);
+  useEffect(() => {
+    tryFetchWithFallback('/api/contacts').then(r => r.ok ? r.json().then(d => setContacts(Array.isArray(d) ? d : [])) : setContacts([])).catch(()=>setContacts([]));
+    tryFetchWithFallback('/api/coa').then(r => r.ok ? r.json().then(d => setCoas(Array.isArray(d) ? d : [])) : setCoas([])).catch(()=>setCoas([]));
+  }, []);
 
   const validate = () => {
     const e: Record<string,string> = {};
@@ -176,7 +182,17 @@ const CheckVouchers: React.FC = () => {
                           const copy=[...checkLines]; copy[idx].check_date = e.target.value; setCheckLines(copy);
                         }} InputLabelProps={{ shrink: true }} /></TableCell>
                         <TableCell><TextField value={cl.check_no} onChange={(e)=>{ const copy=[...checkLines]; copy[idx].check_no = e.target.value; setCheckLines(copy); }} error={!!errors[`check_no_${idx}`]} helperText={errors[`check_no_${idx}`]} /></TableCell>
-                        <TableCell><TextField value={cl.payee} onChange={(e)=>{ const copy=[...checkLines]; copy[idx].payee = e.target.value; setCheckLines(copy); }} error={!!errors[`check_payee_${idx}`]} helperText={errors[`check_payee_${idx}`]} /></TableCell>
+                        <TableCell>
+                          <TextField
+                            select
+                            value={(cl.check_subpayee as any) || ''}
+                            onChange={(e)=>{ const copy=[...checkLines]; copy[idx].check_subpayee = e.target.value ? Number(e.target.value) : null; setCheckLines(copy); }}
+                            helperText={errors[`check_payee_${idx}`]}
+                          >
+                            <MenuItem value="">(Select contact)</MenuItem>
+                            {contacts.map(c => <MenuItem key={c.contact_id} value={c.contact_id}>{c.display_name}</MenuItem>)}
+                          </TextField>
+                        </TableCell>
                         <TableCell align="right"><TextField type="number" value={cl.amount as any} onChange={(e)=>{ const copy=[...checkLines]; copy[idx].amount = e.target.value === '' ? '' : Number(e.target.value); setCheckLines(copy); }} error={!!errors[`check_amount_${idx}`]} helperText={errors[`check_amount_${idx}`]} /></TableCell>
                         <TableCell><IconButton onClick={()=>{ setCheckLines(checkLines.filter((_,i)=>i!==idx)); }}><DeleteIcon /></IconButton></TableCell>
                       </TableRow>
@@ -202,7 +218,17 @@ const CheckVouchers: React.FC = () => {
                 <TableBody>
                   {paymentLines.map((pl, idx) => (
                     <TableRow key={idx}>
-                      <TableCell><TextField value={pl.payee} onChange={(e)=>{ const copy=[...paymentLines]; copy[idx].payee = e.target.value; setPaymentLines(copy); }} error={!!errors[`pl_payee_${idx}`]} helperText={errors[`pl_payee_${idx}`]} /></TableCell>
+                      <TableCell>
+                        <TextField
+                          select
+                          value={(pl.payee_contact_id as any) || ''}
+                          onChange={(e)=>{ const copy=[...paymentLines]; copy[idx].payee_contact_id = e.target.value ? Number(e.target.value) : null; copy[idx].payee = contacts.find(c=>c.contact_id===Number(e.target.value))?.display_name || ''; setPaymentLines(copy); }}
+                          helperText={errors[`pl_payee_${idx}`]}
+                        >
+                          <MenuItem value="">(Select contact)</MenuItem>
+                          {contacts.map(c => <MenuItem key={c.contact_id} value={c.contact_id}>{c.display_name}</MenuItem>)}
+                        </TextField>
+                      </TableCell>
                       <TableCell align="right"><TextField type="number" value={pl.amount as any} onChange={(e)=>{ const copy=[...paymentLines]; copy[idx].amount = e.target.value === '' ? '' : Number(e.target.value); setPaymentLines(copy); }} error={!!errors[`pl_amount_${idx}`]} helperText={errors[`pl_amount_${idx}`]} /></TableCell>
                       <TableCell><IconButton onClick={()=>{ setPaymentLines(paymentLines.filter((_,i)=>i!==idx)); }}><DeleteIcon /></IconButton></TableCell>
                     </TableRow>
