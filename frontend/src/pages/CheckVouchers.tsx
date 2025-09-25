@@ -24,6 +24,7 @@ const CheckVouchers: React.FC = () => {
   const [snackOpen, setSnackOpen] = useState(false);
   const [snackMsg, setSnackMsg] = useState('');
   const [snackSeverity, setSnackSeverity] = useState<'success'|'error'|'info'>('info');
+  const [userNames, setUserNames] = useState<Record<string,string>>({});
 
   const fetchList = async () => {
     try {
@@ -49,6 +50,14 @@ const CheckVouchers: React.FC = () => {
   const openNew = async () => {
     await Promise.all([fetchContacts(), fetchCoas()]);
     setEditing(null);
+    // seed current user into userNames cache when available
+    try {
+      const token = localStorage.getItem('token');
+      const resp = await axios.get(buildUrl('/api/auth/me'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (resp && resp.data && resp.data.user_id) {
+        setUserNames(prev => ({ ...prev, [String(resp.data.user_id)]: resp.data.full_name || resp.data.username || String(resp.data.user_id) }));
+      }
+    } catch (e) {}
     setForm({
       cvoucher_date: new Date().toISOString().slice(0,10),
       purpose: '',
@@ -79,6 +88,45 @@ const CheckVouchers: React.FC = () => {
       check_lines: cv.check_lines && cv.check_lines.length ? cv.check_lines.map((cl:any)=>({ check_date: cl.check_date, check_number: cl.check_number, check_amount: cl.check_amount, check_subpayee: cl.check_subpayee })) : []
     });
     setOpen(true);
+    // seed signatory names cache for prepared/reviewed/approved if numeric IDs
+    try {
+      const token = localStorage.getItem('token');
+      const toResolve: string[] = [];
+      const maybe = (v:any) => (v !== undefined && v !== null) ? v : '';
+      const vals = [maybe(cv.prepared_by), maybe(cv.prepared_by_manual), maybe(cv.reviewed_by), maybe(cv.reviewed_by_manual), maybe(cv.approved_by), maybe(cv.approved_by_manual)];
+      for (const v of vals) {
+        if (v && !isNaN(Number(v))) toResolve.push(String(v));
+      }
+      for (const id of Array.from(new Set(toResolve))) {
+        if (!userNames[id]) {
+          try { const r = await axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} }); if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id })); } catch (e) { }
+        }
+      }
+    } catch (e) {}
+  };
+
+  const parseSignatoryValue = (val:any): string[] => {
+    if (val === undefined || val === null || val === '') return [];
+    if (Array.isArray(val)) return val.map(String).filter(Boolean);
+    if (typeof val === 'number') return [String(val)];
+    if (typeof val === 'string') {
+      try {
+        const p = JSON.parse(val);
+        if (Array.isArray(p)) return p.map(String).filter(Boolean);
+        if (typeof p === 'number' || typeof p === 'string') return [String(p)];
+      } catch (e) {}
+      const m = val.match(/\d+/);
+      if (m) return [m[0]];
+      return [];
+    }
+    return [];
+  };
+
+  const getSignatoryDisplay = (val:any): string => {
+    const ids = parseSignatoryValue(val);
+    if (ids.length) return ids.map(id => userNames[String(id)] || String(id)).join(', ');
+    if (val && typeof val === 'string') return val;
+    return '';
   };
 
   const resetForm = () => { setForm({}); setEditing(null); setOpen(false); };
@@ -414,17 +462,17 @@ const CheckVouchers: React.FC = () => {
                   <div style={{textAlign:'center', width:'30%'}}>
                     <div style={{fontWeight:700}}>Prepared By</div>
                     <div style={{marginTop:24}}>__________________</div>
-                    <div style={{marginTop:8, fontSize:12}}>{previewItem.prepared_by || ''}</div>
+                    <div style={{marginTop:8, fontSize:12}}>{previewItem.prepared_by_name || getSignatoryDisplay(previewItem.prepared_by || previewItem.prepared_by_manual || '')}</div>
                   </div>
                   <div style={{textAlign:'center', width:'30%'}}>
                     <div style={{fontWeight:700}}>Reviewed By</div>
                     <div style={{marginTop:24}}>__________________</div>
-                    <div style={{marginTop:8, fontSize:12}}>{previewItem.reviewed_by || ''}</div>
+                    <div style={{marginTop:8, fontSize:12}}>{previewItem.reviewed_by_name || getSignatoryDisplay(previewItem.reviewed_by || previewItem.reviewed_by_manual || '')}</div>
                   </div>
                   <div style={{textAlign:'center', width:'30%'}}>
                     <div style={{fontWeight:700}}>Approved By</div>
                     <div style={{marginTop:24}}>__________________</div>
-                    <div style={{marginTop:8, fontSize:12}}>{previewItem.approved_by || ''}</div>
+                    <div style={{marginTop:8, fontSize:12}}>{previewItem.approved_by_name || getSignatoryDisplay(previewItem.approved_by || previewItem.approved_by_manual || '')}</div>
                   </div>
                 </div>
               </div>

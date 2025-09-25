@@ -5,7 +5,8 @@
   "description": "A modern web-based Accounting System with a React frontend, Node.js/Express backend, and PostgreSQL database. The system supports authentication, user and role management, and a scalable structure for future modules.",
   "main": "index.js",
   "scripts": {
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "test:server": "jest --config=jest.server.config.js --runInBand"
   },
   "jest": {
     "roots": ["<rootDir>/tests", "<rootDir>/frontend/tests"],
