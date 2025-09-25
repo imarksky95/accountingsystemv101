@@ -72,16 +72,26 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
               {companyName}
             </Typography>
             <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 1 }}>
-              {navItems.map((item) => (
-                <Button
-                  key={item.text}
-                  color={location.pathname === item.path ? 'secondary' : 'inherit'}
-                  onClick={() => navigate(item.path)}
-                  sx={{ textTransform: 'none' }}
-                >
-                  {item.text}
-                </Button>
-              ))}
+              {navItems.map((item) => {
+                const active = location.pathname === item.path;
+                return (
+                  <Button
+                    key={item.text}
+                    onClick={() => navigate(item.path)}
+                    sx={{
+                      textTransform: 'none',
+                      color: active ? 'primary.contrastText' : 'inherit',
+                      backgroundColor: active ? (theme: any) => theme.palette.secondary.main : 'transparent',
+                      borderRadius: '999px',
+                      px: 2,
+                      py: 0.5,
+                      '&:hover': { backgroundColor: active ? (theme: any) => theme.palette.secondary.dark : undefined },
+                    }}
+                  >
+                    {item.text}
+                  </Button>
+                );
+              })}
             </Box>
             <Box sx={{ display: { xs: 'flex', sm: 'none' } }}>
               <IconButton color="inherit" onClick={handleMenuOpen}>
