@@ -1,6 +1,6 @@
 
 import React, { useContext, useState } from 'react';
-import { Box, CssBaseline, Drawer, AppBar, Toolbar, Typography, List, ListItem, ListItemIcon, ListItemText, Avatar, ListItemButton, IconButton, Tooltip } from '@mui/material';
+import { Box, CssBaseline, AppBar, Toolbar, Typography, Avatar, IconButton, Tooltip, Button, Menu, MenuItem } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
@@ -14,32 +14,21 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { UserContext } from '../UserContext';
 import { useCompany } from '../CompanyContext';
 
-const drawerWidth = 240;
-
 const navItems = [
-  { text: 'Dashboard', icon: <HomeIcon />, path: '/dashboard' },
-  { text: 'Banking Management', icon: <AccountBalanceIcon />, path: '/banking' },
-  { text: 'AP Management', icon: <PaymentIcon />, path: '/ap' },
-  { text: 'AR Management', icon: <ReceiptIcon />, path: '/ar' },
-  { text: 'Contacts', icon: <PeopleIcon />, path: '/contacts' },
-  { text: 'Chart of Accounts', icon: <ListAltIcon />, path: '/coa' },
-  { text: 'Payroll', icon: <PaidIcon />, path: '/payroll' },
-  { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+  { text: 'Dashboard', path: '/dashboard' },
+  { text: 'Banking Management', path: '/banking' },
+  { text: 'AP Management', path: '/ap' },
+  { text: 'AR Management', path: '/ar' },
+  { text: 'Contacts', path: '/contacts' },
+  { text: 'Chart of Accounts', path: '/coa' },
+  { text: 'Payroll', path: '/payroll' },
+  { text: 'Settings', path: '/settings' },
 ];
 
 const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, setUser } = useContext(UserContext);
-  const [collapsed, setCollapsed] = useState(false);
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
-    navigate('/login');
-  };
-
-  const handleToggle = () => setCollapsed((prev) => !prev);
 
   // Use companyName from CompanyContext
   const { companyName } = useCompany();
@@ -61,63 +50,68 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
     return palette[id % palette.length];
   })();
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    navigate('/login');
+  };
+
+  // Mobile menu anchor
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+  const handleMenuOpen = (e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget);
+  const handleMenuClose = () => setAnchorEl(null);
+
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <CssBaseline />
-      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-        <Toolbar>
-          <IconButton color="inherit" edge="start" onClick={handleToggle} sx={{ mr: 2 }}>
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" noWrap component="div">
-            {companyName}
-          </Typography>
+      <AppBar position="static" color="primary">
+        <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="h6" noWrap component="div" sx={{ cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>
+              {companyName}
+            </Typography>
+            <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 1 }}>
+              {navItems.map((item) => (
+                <Button
+                  key={item.text}
+                  color={location.pathname === item.path ? 'secondary' : 'inherit'}
+                  onClick={() => navigate(item.path)}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {item.text}
+                </Button>
+              ))}
+            </Box>
+            <Box sx={{ display: { xs: 'flex', sm: 'none' } }}>
+              <IconButton color="inherit" onClick={handleMenuOpen}>
+                <MenuIcon />
+              </IconButton>
+              <Menu anchorEl={anchorEl} open={open} onClose={handleMenuClose}>
+                {navItems.map((item) => (
+                  <MenuItem key={item.text} onClick={() => { handleMenuClose(); navigate(item.path); }}>
+                    {item.text}
+                  </MenuItem>
+                ))}
+              </Menu>
+            </Box>
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ textAlign: 'right', mr: 1 }}>
+              <Typography variant="body2">{displayName}</Typography>
+            </Box>
+            <Tooltip title="Account">
+              <IconButton onClick={() => navigate('/profile')}>
+                <Avatar sx={{ bgcolor: avatarBg }}>{initials}</Avatar>
+              </IconButton>
+            </Tooltip>
+            <Button color="inherit" onClick={handleLogout}>Logout</Button>
+          </Box>
         </Toolbar>
       </AppBar>
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: collapsed ? 72 : drawerWidth,
-          flexShrink: 0,
-          [`& .MuiDrawer-paper`]: {
-            width: collapsed ? 72 : drawerWidth,
-            boxSizing: 'border-box',
-            overflowX: 'hidden',
-            transition: 'width 0.2s',
-          },
-        }}
-      >
-        <Toolbar />
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 2 }}>
-                <>
-                  <Avatar sx={{ bgcolor: avatarBg, width: 64, height: 64, mb: 1 }}>{initials}</Avatar>
-                  {!collapsed && <Typography variant="subtitle1">{displayName}</Typography>}
-                </>
-          {!collapsed && (
-            <ListItemButton sx={{ mt: 2, color: 'red' }} onClick={handleLogout}>
-              <ListItemText primary="Logout" />
-            </ListItemButton>
-          )}
-        </Box>
-        <List>
-          {navItems.map((item) => (
-            <ListItem key={item.text} disablePadding sx={{ justifyContent: 'center' }}>
-              <Tooltip title={item.text} placement="right" disableHoverListener={!collapsed}>
-                <ListItemButton
-                  selected={location.pathname === item.path}
-                  onClick={() => navigate(item.path)}
-                  sx={{ justifyContent: collapsed ? 'center' : 'flex-start', px: collapsed ? 2 : 3 }}
-                >
-                  <ListItemIcon sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: 'center' }}>{item.icon}</ListItemIcon>
-                  {!collapsed && <ListItemText primary={item.text} />}
-                </ListItemButton>
-              </Tooltip>
-            </ListItem>
-          ))}
-        </List>
-      </Drawer>
+
       <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default', p: 3 }}>
-        <Toolbar />
         {children}
       </Box>
     </Box>
