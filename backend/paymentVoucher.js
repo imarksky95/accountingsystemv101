@@ -441,6 +441,39 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Submit PV for approval routing
+const approvalRouting = require('./approvalRouting');
+router.post('/:id/submit', async (req, res) => {
+  const id = req.params.id;
+  const db = getDbPool(req);
+  try {
+    // Check existence
+    const [[pv]] = await db.execute('SELECT * FROM payment_vouchers WHERE payment_voucher_id = ? LIMIT 1', [id]);
+    if (!pv) return res.status(404).json({ error: 'Not found' });
+
+    const actorUserId = req.user && req.user.user_id ? Number(req.user.user_id) : null;
+    const routing = await approvalRouting.routeDocument(db, 'payment_voucher', Number(id), actorUserId);
+
+    if (!routing.requiresApproval) {
+      // Not required: mark as submitted/ready and return
+      await db.execute('UPDATE payment_vouchers SET status = ? WHERE payment_voucher_id = ?', ['submitted', id]);
+      return res.json({ success: true, message: 'Submitted (no approval routing required)', routing });
+    }
+
+    // Apply routing to document row if possible
+    await approvalRouting.applyRoutingToDocument(db, 'payment_voucher', Number(id), routing);
+
+    // Update status to indicate it's pending review/approval
+    const newStatus = routing.reviewer && (routing.reviewer.id || routing.reviewer.manual) ? 'for_review' : 'for_approval';
+    await db.execute('UPDATE payment_vouchers SET status = ? WHERE payment_voucher_id = ?', [newStatus, id]);
+
+    res.json({ success: true, message: 'Routed for approval', routing });
+  } catch (err) {
+    console.error('POST /api/payment-vouchers/:id/submit failed', err && err.stack ? err.stack : err);
+    res.status(500).json({ error: String(err && err.message ? err.message : err) });
+  }
+});
+
 // Delete
 router.delete('/:id', async (req, res) => {
   const id = req.params.id;

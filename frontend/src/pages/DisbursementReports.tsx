@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCrud } from '../hooks/useCrud';
 import axios from 'axios';
-import { Snackbar, Alert, CircularProgress } from '@mui/material';
+import { Snackbar, Alert, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import { buildUrl, API_BASE as RESOLVED_API_BASE } from '../apiBase';
 import { formatDateToMMDDYYYY } from '../utils/date';
 console.debug && console.debug('DisbursementReports: resolved API_BASE =', RESOLVED_API_BASE || '(empty, using fallback)');
@@ -24,6 +24,11 @@ export default function DisbursementReports() {
   const [snackOpen, setSnackOpen] = useState(false);
   const [snackMsg, setSnackMsg] = useState('');
   const [snackSeverity, setSnackSeverity] = useState<'success'|'error'|'info'>('info');
+  const [submitModalOpen, setSubmitModalOpen] = useState(false);
+  const [currentReport, setCurrentReport] = useState<any>(null);
+  const [routingInfo, setRoutingInfo] = useState<any>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [cascadeNow, setCascadeNow] = useState(false);
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error loading reports</div>;
@@ -92,9 +97,24 @@ export default function DisbursementReports() {
                 <strong>{r.disbursement_report_ctrl_number}</strong> — {formatDateToMMDDYYYY(r.disbursement_date)} — {r.status}
               </div>
               <div>
-                <button onClick={() => setExpanded(prev => ({...prev, [r.disbursement_report_id]: !prev[r.disbursement_report_id]}))}>
-                  {expanded[r.disbursement_report_id] ? 'Hide' : 'Show'} Vouchers
-                </button>
+                  <button onClick={() => setExpanded(prev => ({...prev, [r.disbursement_report_id]: !prev[r.disbursement_report_id]}))}>
+                    {expanded[r.disbursement_report_id] ? 'Hide' : 'Show'} Vouchers
+                  </button>
+                  <button style={{marginLeft:8}} onClick={async () => {
+                    // fetch routing preview
+                    try {
+                      const res = await axios.get(`/api/disbursement-reports/${r.disbursement_report_id}`);
+                      setCurrentReport(res.data);
+                      // call routing preview endpoint (reuse routeReport via submit with cascade=false and autoApprove=false?)
+                      const routeRes = await axios.post(`/api/disbursement-reports/${r.disbursement_report_id}/submit`, { cascade: false }, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(x => x.data);
+                      setRoutingInfo(routeRes.routing || null);
+                      setSubmitModalOpen(true);
+                    } catch (e:any) {
+                      setSnackMsg(e.response?.data?.error || e.message || 'Routing preview failed');
+                      setSnackSeverity('error');
+                      setSnackOpen(true);
+                    }
+                  }}>Submit for Approval</button>
               </div>
             </div>
             {expanded[r.disbursement_report_id] && (
@@ -126,6 +146,42 @@ export default function DisbursementReports() {
       <Snackbar open={snackOpen} autoHideDuration={4000} onClose={() => setSnackOpen(false)}>
         <Alert severity={snackSeverity} sx={{ width: '100%' }}>{snackMsg}</Alert>
       </Snackbar>
+      <Dialog open={submitModalOpen} onClose={() => setSubmitModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Submit Disbursement Report for Approval</DialogTitle>
+        <DialogContent>
+          {routingInfo ? (
+            <div>
+              <div><strong>Reviewer:</strong> {routingInfo.reviewer ? (routingInfo.reviewer.id || routingInfo.reviewer.manual) : 'None'}</div>
+              <div><strong>Approver:</strong> {routingInfo.approver ? (routingInfo.approver.id || routingInfo.approver.manual) : 'None'}</div>
+              <div style={{marginTop:8}}>
+                <label><input type="checkbox" checked={cascadeNow} onChange={(e) => setCascadeNow(e.target.checked)} /> Cascade immediately if approver present</label>
+              </div>
+              {routingInfo.notes && routingInfo.notes.length > 0 && (
+                <div style={{marginTop:8}}><strong>Notes:</strong><ul>{routingInfo.notes.map((n:any,i:number)=>(<li key={i}>{n}</li>))}</ul></div>
+              )}
+            </div>
+          ) : <div>Loading routing info...</div>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSubmitModalOpen(false)}>Cancel</Button>
+          <Button color="primary" variant="contained" disabled={submitting} onClick={async () => {
+            if (!currentReport) return;
+            setSubmitting(true);
+            try {
+              const res = await axios.post(`/api/disbursement-reports/${currentReport.disbursement_report_id}/submit`, { cascade: cascadeNow }, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+              setSnackMsg(res.data.message || 'Submitted');
+              setSnackSeverity('success');
+              setSnackOpen(true);
+              setSubmitModalOpen(false);
+              fetchAll();
+            } catch (e:any) {
+              setSnackMsg(e.response?.data?.error || e.message || 'Submit failed');
+              setSnackSeverity('error');
+              setSnackOpen(true);
+            } finally { setSubmitting(false); }
+          }}>Submit</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

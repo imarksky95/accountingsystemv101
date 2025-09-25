@@ -55,6 +55,55 @@ router.get('/:id', async (req, res) => {
 
 const authenticate = require('./middleware/authenticate');
 
+const approvalRouting = require('./approvalRouting');
+
+// Submit disbursement report for approval routing
+router.post('/:id/submit', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { cascade = false, autoApprove = false } = req.body || {};
+  const dbPool = getDbPool(req);
+  try {
+    // Ensure report exists
+    const [rows] = await dbPool.execute('SELECT * FROM disbursement_reports WHERE disbursement_report_id = ? LIMIT 1', [id]);
+    if (!rows || rows.length === 0) return res.status(404).json({ error: 'Not found' });
+
+    const actorUserId = req.user && req.user.user_id ? Number(req.user.user_id) : null;
+    const routing = await approvalRouting.routeReport(dbPool, Number(id), actorUserId);
+
+    // Apply routing to the report row if possible
+    await approvalRouting.applyRoutingToDocument(dbPool, 'disbursement_report', Number(id), routing);
+
+    // Update status to indicate submitted / for review
+    const statusSet = routing.reviewer ? 'for_review' : (routing.approver ? 'for_approval' : 'submitted');
+    await dbPool.execute('UPDATE disbursement_reports SET status = ? WHERE disbursement_report_id = ?', [statusSet, id]);
+
+    // Optionally auto-approve (for testing) or when autoApprove flag used by a privileged actor
+    if (autoApprove) {
+      // mark report approved and cascade
+      await dbPool.execute("UPDATE disbursement_reports SET status = 'approved', approved_at = NOW() WHERE disbursement_report_id = ?", [id]);
+      // cascade to linked documents
+      await approvalRouting.cascadeApproveDocuments(dbPool, Number(id), { setApprovedAt: true, approverId: actorUserId });
+      // log approval
+      try { if ((await dbPool.execute("SHOW TABLES LIKE 'approval_logs'"))[0].length) await dbPool.execute('INSERT INTO approval_logs (entity_type, entity_id, action, actor_user_id, payload) VALUES (?, ?, ?, ?, ?)', ['disbursement_report', id, 'auto_approved_and_cascaded', actorUserId || null, JSON.stringify({ routing })]); } catch (e) { }
+      return res.json({ success: true, message: 'Report auto-approved and cascaded', routing });
+    }
+
+    // If caller requested immediate cascade after routing (e.g., when routing has approver present), run cascade
+    if (cascade && routing.approver) {
+      // if declared approver present, set approved and cascade
+      await dbPool.execute("UPDATE disbursement_reports SET status = 'approved', approved_at = NOW() WHERE disbursement_report_id = ?", [id]);
+      await approvalRouting.cascadeApproveDocuments(dbPool, Number(id), { setApprovedAt: true, approverId: routing.approver.id || null });
+      try { if ((await dbPool.execute("SHOW TABLES LIKE 'approval_logs'"))[0].length) await dbPool.execute('INSERT INTO approval_logs (entity_type, entity_id, action, actor_user_id, payload) VALUES (?, ?, ?, ?, ?)', ['disbursement_report', id, 'approved_and_cascaded', actorUserId || null, JSON.stringify({ routing })]); } catch (e) { }
+      return res.json({ success: true, message: 'Report approved and cascaded', routing });
+    }
+
+    res.json({ success: true, message: 'Report routed for approval', routing });
+  } catch (err) {
+    console.error('POST /api/disbursement-reports/:id/submit failed', err && err.stack ? err.stack : err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Create a disbursement report (multi-select vouchers)
 router.post('/', authenticate, async (req, res) => {
   const {
@@ -156,6 +205,26 @@ router.delete('/:id', authenticate, async (req, res) => {
     const dbPool = getDbPool(req);
     await dbPool.execute('DELETE FROM disbursement_reports WHERE disbursement_report_id=?', [id]);
     res.json({ message: 'Disbursement report deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Mark report as paid/released (idempotent)
+router.post('/:id/mark-paid', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const dbPool = getDbPool(req);
+  const actorUserId = req.user && req.user.user_id ? Number(req.user.user_id) : null;
+  try {
+    // Only allow transition if current status is 'approved'
+    const [rows] = await dbPool.execute('SELECT status FROM disbursement_reports WHERE disbursement_report_id = ? LIMIT 1', [id]);
+    if (!rows || rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    const cur = rows[0].status || null;
+    if (cur !== 'approved') return res.status(400).json({ error: 'Report must be approved before marking as paid' });
+    await dbPool.execute("UPDATE disbursement_reports SET status = 'paid/released', paid_at = NOW() WHERE disbursement_report_id = ?", [id]);
+    // log action
+    try { if ((await dbPool.execute("SHOW TABLES LIKE 'approval_logs'"))[0].length) await dbPool.execute('INSERT INTO approval_logs (entity_type, entity_id, action, actor_user_id, payload) VALUES (?, ?, ?, ?, ?)', ['disbursement_report', id, 'marked_paid', actorUserId || null, JSON.stringify({})]); } catch (e) { }
+    res.json({ success: true, message: 'Marked as paid/released' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

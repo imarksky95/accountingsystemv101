@@ -7,6 +7,15 @@
   "scripts": {
     "test": "jest --runInBand"
   },
+  "jest": {
+    "roots": ["<rootDir>/tests", "<rootDir>/frontend/tests"],
+    "testMatch": [
+      "<rootDir>/tests/**/*.test.[jt]s?(x)",
+      "<rootDir>/tests/**/*.spec.[jt]s?(x)",
+      "<rootDir>/frontend/tests/**/*.test.[jt]s?(x)",
+      "<rootDir>/frontend/tests/**/*.spec.[jt]s?(x)"
+    ]
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
