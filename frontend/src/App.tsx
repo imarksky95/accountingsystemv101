@@ -1,20 +1,21 @@
-import React, { useContext, ReactElement } from 'react';
+import React, { useContext, ReactElement, Suspense } from 'react';
 import { CompanyProvider } from './CompanyContext';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { UserContext } from './UserContext';
 
-import DashboardLayout from './components/DashboardLayout';
-import Dashboard from './pages/Dashboard';
-import BankingManagement from './pages/BankingManagement';
-import APManagement from './pages/APManagement';
-import ARManagement from './pages/ARManagement';
-import Contacts from './pages/Contacts';
-import ChartOfAccounts from './pages/ChartOfAccounts';
-import Payroll from './pages/Payroll';
-import Settings from './pages/Settings';
-import UsersAndRoleSettings from './pages/UsersAndRoleSettings';
+// Lazy-load heavy dashboard components so login page loads quickly without the dashboard bundle
+const DashboardLayout = React.lazy(() => import('./components/DashboardLayout'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const BankingManagement = React.lazy(() => import('./pages/BankingManagement'));
+const APManagement = React.lazy(() => import('./pages/APManagement'));
+const ARManagement = React.lazy(() => import('./pages/ARManagement'));
+const Contacts = React.lazy(() => import('./pages/Contacts'));
+const ChartOfAccounts = React.lazy(() => import('./pages/ChartOfAccounts'));
+const Payroll = React.lazy(() => import('./pages/Payroll'));
+const Settings = React.lazy(() => import('./pages/Settings'));
+const UsersAndRoleSettings = React.lazy(() => import('./pages/UsersAndRoleSettings'));
 
 // ...existing code... (dashboard page moved to ./pages/Dashboard)
 
@@ -28,16 +29,18 @@ function App() {
   return (
     <CompanyProvider>
     <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+  <Route path="/login" element={<Login />} />
+  <Route path="/register" element={<Register />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <DashboardLayout>
-                <Dashboard />
-              </DashboardLayout>
+              <Suspense fallback={<div>Loading dashboard...</div>}>
+                <DashboardLayout>
+                  <Dashboard />
+                </DashboardLayout>
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -45,9 +48,11 @@ function App() {
           path="/banking"
           element={
             <ProtectedRoute>
-              <DashboardLayout>
-                <BankingManagement />
-              </DashboardLayout>
+              <Suspense fallback={<div>Loading banking...</div>}>
+                <DashboardLayout>
+                  <BankingManagement />
+                </DashboardLayout>
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -55,9 +60,11 @@ function App() {
           path="/ap"
           element={
             <ProtectedRoute>
-              <DashboardLayout>
-                <APManagement />
-              </DashboardLayout>
+              <Suspense fallback={<div>Loading AP...</div>}>
+                <DashboardLayout>
+                  <APManagement />
+                </DashboardLayout>
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -65,9 +72,11 @@ function App() {
           path="/ar"
           element={
             <ProtectedRoute>
-              <DashboardLayout>
-                <ARManagement />
-              </DashboardLayout>
+              <Suspense fallback={<div>Loading AR...</div>}>
+                <DashboardLayout>
+                  <ARManagement />
+                </DashboardLayout>
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -75,9 +84,11 @@ function App() {
           path="/contacts"
           element={
             <ProtectedRoute>
-              <DashboardLayout>
-                <Contacts />
-              </DashboardLayout>
+              <Suspense fallback={<div>Loading contacts...</div>}>
+                <DashboardLayout>
+                  <Contacts />
+                </DashboardLayout>
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -85,9 +96,11 @@ function App() {
           path="/coa"
           element={
             <ProtectedRoute>
-              <DashboardLayout>
-                <ChartOfAccounts />
-              </DashboardLayout>
+              <Suspense fallback={<div>Loading COA...</div>}>
+                <DashboardLayout>
+                  <ChartOfAccounts />
+                </DashboardLayout>
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -95,9 +108,11 @@ function App() {
           path="/payroll"
           element={
             <ProtectedRoute>
-              <DashboardLayout>
-                <Payroll />
-              </DashboardLayout>
+              <Suspense fallback={<div>Loading payroll...</div>}>
+                <DashboardLayout>
+                  <Payroll />
+                </DashboardLayout>
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -105,9 +120,11 @@ function App() {
           path="/settings"
           element={
             <ProtectedRoute>
-              <DashboardLayout>
-                <Settings />
-              </DashboardLayout>
+              <Suspense fallback={<div>Loading settings...</div>}>
+                <DashboardLayout>
+                  <Settings />
+                </DashboardLayout>
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -115,9 +132,11 @@ function App() {
           path="/roles-settings"
           element={
             <ProtectedRoute>
-              <DashboardLayout>
-                <UsersAndRoleSettings />
-              </DashboardLayout>
+              <Suspense fallback={<div>Loading role settings...</div>}>
+                <DashboardLayout>
+                  <UsersAndRoleSettings />
+                </DashboardLayout>
+              </Suspense>
             </ProtectedRoute>
           }
         />
