@@ -2,14 +2,6 @@
 import React, { useContext, useState } from 'react';
 import { Box, CssBaseline, AppBar, Toolbar, Typography, Avatar, IconButton, Tooltip, Button, Menu, MenuItem } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import HomeIcon from '@mui/icons-material/Home';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import PaymentIcon from '@mui/icons-material/Payment';
-import ReceiptIcon from '@mui/icons-material/Receipt';
-import PeopleIcon from '@mui/icons-material/People';
-import ListAltIcon from '@mui/icons-material/ListAlt';
-import SettingsIcon from '@mui/icons-material/Settings';
-import PaidIcon from '@mui/icons-material/Paid';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserContext } from '../UserContext';
 import { useCompany } from '../CompanyContext';
@@ -68,24 +60,33 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       <AppBar position="static" color="primary">
         <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h6" noWrap component="div" sx={{ cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>
+            <Button
+              onClick={() => navigate('/dashboard')}
+              color="inherit"
+              aria-label={`Home - ${companyName}`}
+              sx={{ textTransform: 'none', fontSize: '1.125rem', fontWeight: 600, p: 0 }}
+            >
               {companyName}
-            </Typography>
-            <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 1 }}>
+            </Button>
+            <Box role="navigation" aria-label="Primary" sx={{ display: { xs: 'none', sm: 'flex' }, gap: 1 }}>
               {navItems.map((item) => {
                 const active = location.pathname === item.path;
                 return (
                   <Button
                     key={item.text}
                     onClick={() => navigate(item.path)}
+                    role="link"
+                    aria-current={active ? 'page' : undefined}
                     sx={{
                       textTransform: 'none',
-                      color: active ? 'primary.contrastText' : 'inherit',
+                      color: active ? (theme: any) => theme.palette.getContrastText(theme.palette.secondary.main) : 'inherit',
                       backgroundColor: active ? (theme: any) => theme.palette.secondary.main : 'transparent',
                       borderRadius: '999px',
                       px: 2,
                       py: 0.5,
-                      '&:hover': { backgroundColor: active ? (theme: any) => theme.palette.secondary.dark : undefined },
+                      minHeight: 36,
+                      '&:hover': { backgroundColor: active ? (theme: any) => theme.palette.secondary.dark : (theme: any) => theme.palette.action.hover },
+                      '&:focus-visible': { outline: (theme: any) => `3px solid ${theme.palette.primary.light}`, outlineOffset: '2px' },
                     }}
                   >
                     {item.text}
@@ -94,10 +95,10 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
               })}
             </Box>
             <Box sx={{ display: { xs: 'flex', sm: 'none' } }}>
-              <IconButton color="inherit" onClick={handleMenuOpen}>
+              <IconButton color="inherit" onClick={handleMenuOpen} aria-label="Open main menu" id="nav-menu-button">
                 <MenuIcon />
               </IconButton>
-              <Menu anchorEl={anchorEl} open={open} onClose={handleMenuClose}>
+              <Menu anchorEl={anchorEl} open={open} onClose={handleMenuClose} aria-label="Main menu" id="main-menu" MenuListProps={{ 'aria-labelledby': 'nav-menu-button' }}>
                 {navItems.map((item) => (
                   <MenuItem key={item.text} onClick={() => { handleMenuClose(); navigate(item.path); }}>
                     {item.text}
@@ -112,11 +113,11 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
               <Typography variant="body2">{displayName}</Typography>
             </Box>
             <Tooltip title="Account">
-              <IconButton onClick={() => navigate('/profile')}>
+              <IconButton onClick={() => navigate('/profile')} aria-label={`Account of ${displayName}`}>
                 <Avatar sx={{ bgcolor: avatarBg }}>{initials}</Avatar>
               </IconButton>
             </Tooltip>
-            <Button color="inherit" onClick={handleLogout}>Logout</Button>
+            <Button color="inherit" onClick={handleLogout} aria-label="Logout">Logout</Button>
           </Box>
         </Toolbar>
       </AppBar>
