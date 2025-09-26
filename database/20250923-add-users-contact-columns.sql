@@ -1,8 +1,0 @@
--- Migration: add contact fields to users
-ALTER TABLE `users`
-  ADD COLUMN IF NOT EXISTS `full_name` VARCHAR(255) DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `email` VARCHAR(255) DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `mobile` VARCHAR(50) DEFAULT NULL;
-
--- Verify:
--- DESCRIBE users;
