@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, Snackbar, Alert, IconButton, Table, TableHead, TableRow, TableCell, TableBody, Grid, Paper, Divider, Typography } from '@mui/material';
+import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, Snackbar, Alert, IconButton, Table, TableHead, TableRow, TableCell, TableBody, Grid, Paper, Divider, Typography, Autocomplete } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
 import { tryFetchWithFallback, buildUrl } from '../apiBase';
@@ -25,6 +25,7 @@ const CheckVouchers: React.FC = () => {
   const [snackMsg, setSnackMsg] = useState('');
   const [snackSeverity, setSnackSeverity] = useState<'success'|'error'|'info'>('info');
   const [userNames, setUserNames] = useState<Record<string,string>>({});
+  const [userOptions, setUserOptions] = useState<Array<{user_id:number, full_name?:string, username?:string}>>([]);
 
   const fetchList = async () => {
     try {
@@ -47,15 +48,29 @@ const CheckVouchers: React.FC = () => {
     try { const r = await axios.get(buildUrl('/api/coa/all/simple')); setCoas(Array.isArray(r.data)?r.data:[]); return r.data; } catch (e) { setCoas([]); return []; }
   };
 
+  const fetchUserOptions = async () => {
+    try {
+      const r = await axios.get(buildUrl('/api/users/public'));
+      setUserOptions(Array.isArray(r.data) ? r.data : []);
+      // seed userNames cache
+      const map: Record<string,string> = {};
+      for (const u of (r.data||[])) { if (u && u.user_id) map[String(u.user_id)] = u.full_name || u.username || String(u.user_id); }
+      setUserNames(prev => ({ ...map, ...prev }));
+      return r.data;
+    } catch (e) { return []; }
+  };
+
   const openNew = async () => {
-    await Promise.all([fetchContacts(), fetchCoas()]);
+    await Promise.all([fetchContacts(), fetchCoas(), fetchUserOptions()]);
     setEditing(null);
     // seed current user into userNames cache when available
+    let currentUserId: number | null = null;
     try {
       const token = localStorage.getItem('token');
-      const resp = await axios.get(buildUrl('/api/auth/me'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-      if (resp && resp.data && resp.data.user_id) {
-        setUserNames(prev => ({ ...prev, [String(resp.data.user_id)]: resp.data.full_name || resp.data.username || String(resp.data.user_id) }));
+      const meResp = await axios.get(buildUrl('/api/auth/me'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (meResp && meResp.data && meResp.data.user_id) {
+        currentUserId = meResp.data.user_id;
+        setUserNames(prev => ({ ...prev, [String(meResp.data.user_id)]: meResp.data.full_name || meResp.data.username || String(meResp.data.user_id) }));
       }
     } catch (e) {}
     setForm({
@@ -66,7 +81,7 @@ const CheckVouchers: React.FC = () => {
       // check lines for multi-check mode
       mode: 'single',
       check_lines: [],
-      prepared_by: null,
+      prepared_by: currentUserId,
       reviewed_by: null,
       approved_by: null,
       paid_through: 'Bank',
@@ -77,7 +92,7 @@ const CheckVouchers: React.FC = () => {
   };
 
   const openEdit = async (cv:any) => {
-    await Promise.all([fetchContacts(), fetchCoas()]);
+    await Promise.all([fetchContacts(), fetchCoas(), fetchUserOptions()]);
     setEditing(cv);
     setForm({
       ...cv,
@@ -153,16 +168,31 @@ const CheckVouchers: React.FC = () => {
       prepared_by: form.prepared_by || null,
       description: form.description || '',
       payment_lines: mappedPaymentLines,
-      journal_lines: mappedJournalLines,
-      reviewed_by: form.reviewed_by || null,
-      approved_by: form.approved_by || null
+      journal_lines: mappedJournalLines
     };
-    // include check_lines if multi
+    // map reviewers/approvers: numeric -> reviewer_id/approver_id, free text -> reviewer_manual/approver_manual
+    const parseReviewer = (v:any) => {
+      if (v === null || v === undefined || v === '') return { id: null, manual: null };
+      if (!isNaN(Number(v))) return { id: Number(v), manual: null };
+      return { id: null, manual: String(v) };
+    };
+    const rv = parseReviewer(form.reviewed_by);
+    const av = parseReviewer(form.approved_by);
+    if (rv.id) payload.reviewer_id = rv.id; else if (rv.manual) payload.reviewer_manual = rv.manual;
+    if (av.id) payload.approver_id = av.id; else if (av.manual) payload.approver_manual = av.manual;
+    // keep legacy fields as well
+    payload.reviewed_by = form.reviewed_by || null;
+    payload.approved_by = form.approved_by || null;
+    // include check_lines if multi; for single mode include check_no and check_amount
     if (form.mode === 'multi' && Array.isArray(form.check_lines)) {
       payload.check_lines = (form.check_lines || []).map((c:any)=>({ check_number: c.check_number || c.check_no || null, check_date: c.check_date || null, check_amount: Number(c.check_amount)||0, check_subpayee: c.check_subpayee || null }));
       payload.multiple_checks = 1;
     } else {
       payload.multiple_checks = 0;
+      // include single-check fields
+      if (form.check_no) payload.check_no = form.check_no;
+      // include top-level check_amount if present (otherwise backend computes from payment_lines)
+      if (form.check_amount || form.check_amount === 0) payload.check_amount = Number(form.check_amount);
     }
 
     try {
@@ -261,6 +291,13 @@ const CheckVouchers: React.FC = () => {
             <TextField inputRef={firstFocusRef} label="Check Date" type="date" value={form.cvoucher_date || ''} onChange={e => setForm({...form, cvoucher_date: e.target.value})} InputLabelProps={{ shrink: true }} />
             <TextField label="Purpose" value={form.purpose || ''} onChange={e => setForm({...form, purpose: e.target.value})} />
           </Box>
+
+          {/* Single check number field (only when mode is single) */}
+          {form.mode !== 'multi' && (
+            <Box sx={{mb:2}}>
+              <TextField label="Check Number" value={form.check_no || ''} onChange={e => setForm({...form, check_no: e.target.value})} />
+            </Box>
+          )}
 
           {/* Mode: single or multi checks */}
           <Box sx={{my:1}}>
@@ -397,8 +434,41 @@ const CheckVouchers: React.FC = () => {
             <Box sx={{fontWeight:700, mb:1}}>SIGNATORIES</Box>
             <Box sx={{display:'grid', gridTemplateColumns: '1fr 1fr 1fr', gap:2}}>
               <TextField label="Prepared By" value={form.prepared_by || ''} disabled />
-              <TextField label="Reviewed By" value={form.reviewed_by || ''} onChange={e => setForm({...form, reviewed_by: e.target.value})} />
-              <TextField label="Approved By" value={form.approved_by || ''} onChange={e => setForm({...form, approved_by: e.target.value})} />
+              <Autocomplete
+                freeSolo
+                options={userOptions.map(u => ({ id: u.user_id, label: u.full_name || u.username || String(u.user_id) }))}
+                getOptionLabel={(opt:any) => typeof opt === 'string' ? opt : (opt && opt.label) || ''}
+                value={(() => {
+                  const v = form.reviewed_by;
+                  if (!v && v !== 0) return '';
+                  if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
+                  return v;
+                })()}
+                onChange={(_, newVal) => {
+                  // newVal may be string (manual) or object {id,label}
+                  if (!newVal) return setForm({...form, reviewed_by: null});
+                  if (typeof newVal === 'string') return setForm({...form, reviewed_by: newVal});
+                  return setForm({...form, reviewed_by: newVal.id});
+                }}
+                renderInput={(params) => <TextField {...params} label="Reviewed By" />}
+              />
+              <Autocomplete
+                freeSolo
+                options={userOptions.map(u => ({ id: u.user_id, label: u.full_name || u.username || String(u.user_id) }))}
+                getOptionLabel={(opt:any) => typeof opt === 'string' ? opt : (opt && opt.label) || ''}
+                value={(() => {
+                  const v = form.approved_by;
+                  if (!v && v !== 0) return '';
+                  if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
+                  return v;
+                })()}
+                onChange={(_, newVal) => {
+                  if (!newVal) return setForm({...form, approved_by: null});
+                  if (typeof newVal === 'string') return setForm({...form, approved_by: newVal});
+                  return setForm({...form, approved_by: newVal.id});
+                }}
+                renderInput={(params) => <TextField {...params} label="Approved By" />}
+              />
             </Box>
           </Box>
         </DialogContent>
@@ -416,8 +486,11 @@ const CheckVouchers: React.FC = () => {
             <div id="cv-print-area" style={{padding:20, fontFamily: 'Arial, sans-serif', color: '#000'}}>
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20}}>
                 <div>
-                  <div style={{fontSize:20, fontWeight:700}}>{/* company name if available */}</div>
-                  <div style={{fontSize:12}}></div>
+                  <div style={{fontSize:20, fontWeight:700}}>{previewItem.company ? (previewItem.company.name || previewItem.company.company_name || '') : ''}</div>
+                  <div style={{fontSize:12}}>{previewItem.company ? (previewItem.company.address || '') : ''}</div>
+                </div>
+                <div>
+                  {previewItem.company && previewItem.company.logo ? <img src={previewItem.company.logo} alt="logo" style={{height:60}}/> : null}
                 </div>
               </div>
               <hr />
