@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = 'https://accountingsystemv101-1.onrender.com/api/auth';
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5000';
+const API_URL = `${API_BASE.replace(/\/$/, '')}/api/auth`;
 
 export async function register(
   username: string,

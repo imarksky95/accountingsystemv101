@@ -94,9 +94,8 @@ const PaymentVouchers: React.FC = () => {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // Multi-select for DR creation
+  // Multi-select (previously used for DR creation)
   const [selected, setSelected] = useState<Record<number, boolean>>({});
-  const [creatingDR, setCreatingDR] = useState(false);
 
   // Snackbar
   const [snackOpen, setSnackOpen] = useState(false);
@@ -454,28 +453,7 @@ const PaymentVouchers: React.FC = () => {
 
   const toggleSelect = (id: number) => setSelected(prev => ({ ...prev, [id]: !prev[id] }));
 
-  const createDR = async () => {
-    const ids = Object.keys(selected).filter(k => selected[+k]).map(k => +k);
-    if (ids.length === 0) { setSnackMsg('Select at least one PV'); setSnackSeverity('info'); setSnackOpen(true); return; }
-  const amount_to_pay = items.filter(p => ids.includes(p.payment_voucher_id)).reduce((s, p) => s + (Number(p.amount_to_pay) || (p.payment_lines && p.payment_lines.length ? p.payment_lines.reduce((ss:any,l:any)=>ss + (Number(l.amount)||0),0) : 0) ), 0);
-    setCreatingDR(true);
-    try {
-      const token = localStorage.getItem('token');
-  await axios.post(buildUrl('/api/disbursement-reports'), {
-        status: 'Draft',
-        disbursement_date: new Date().toISOString().slice(0,10),
-        purpose: 'Created from selected PVs',
-        amount_to_pay,
-        paid_through: 'Bank',
-        voucher_ids: ids
-      }, { headers: { Authorization: `Bearer ${token}` } });
-      setSnackMsg('Disbursement Report created'); setSnackSeverity('success'); setSnackOpen(true);
-      setSelected({});
-      fetchAll();
-    } catch (e:any) {
-      setSnackMsg(e.response?.data?.error || e.message || 'Create DR failed'); setSnackSeverity('error'); setSnackOpen(true);
-    } finally { setCreatingDR(false); }
-  };
+  // createDR removed — feature deprecated
 
   return (
     <Box>
@@ -618,9 +596,7 @@ const PaymentVouchers: React.FC = () => {
         </Table>
       )}
 
-      <div style={{marginTop:'1rem'}}>
-        <Button variant="contained" color="primary" onClick={createDR} disabled={creatingDR}>{creatingDR ? <><CircularProgress size={16} /> Creating...</> : 'Create DR from selected'}</Button>
-      </div>
+      {/* 'Create DR from selected' removed — feature deprecated */}
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="lg">
         <DialogTitle>{editing ? `Edit Payment Voucher (${expectedControl || (editing && editing.payment_voucher_control) || ''})` : `New Payment Voucher${expectedControl ? ' (expected: ' + expectedControl + ')' : ''}`}<IconButton aria-label="close" onClick={() => setOpen(false)} sx={{position:'absolute', right:8, top:8}}><CloseIcon /></IconButton></DialogTitle>

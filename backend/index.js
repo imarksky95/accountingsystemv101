@@ -25,6 +25,8 @@ app.use(cors({
     try {
       const url = new URL(origin);
       if (url.hostname && url.hostname.endsWith('.github.io')) return callback(null, true);
+      // Allow localhost variants (any port) and 127.0.0.1 for local development
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return callback(null, true);
     } catch (e) {
       // ignore
     }
