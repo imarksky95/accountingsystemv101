@@ -433,22 +433,32 @@ const CheckVouchers: React.FC = () => {
           <Box sx={{mt:2, mb:2}}>
             <Box sx={{fontWeight:700, mb:1}}>SIGNATORIES</Box>
             <Box sx={{display:'grid', gridTemplateColumns: '1fr 1fr 1fr', gap:2}}>
-              <TextField label="Prepared By" value={form.prepared_by || ''} disabled />
+              <TextField label="Prepared By" value={(form.prepared_by_manual && form.prepared_by_manual) || (form.prepared_by && userNames[String(form.prepared_by)]) || ''} disabled />
               <Autocomplete
                 freeSolo
                 options={userOptions.map(u => ({ id: u.user_id, label: u.full_name || u.username || String(u.user_id) }))}
                 getOptionLabel={(opt:any) => typeof opt === 'string' ? opt : (opt && opt.label) || ''}
+                // value is the selected option or a string when freeSolo; keep input in sync with form.reviewed_by
                 value={(() => {
                   const v = form.reviewed_by;
-                  if (!v && v !== 0) return '';
+                  if (v === null || v === undefined || v === '') return '';
                   if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
                   return v;
                 })()}
+                inputValue={(() => {
+                  const v = form.reviewed_by;
+                  if (v === null || v === undefined || v === '') return '';
+                  if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
+                  return v;
+                })()}
+                onInputChange={(_, newInput) => {
+                  // keep the form in sync with typed input (freeSolo)
+                  setForm((prev: any) => ({ ...prev, reviewed_by: newInput }));
+                }}
                 onChange={(_, newVal) => {
-                  // newVal may be string (manual) or object {id,label}
-                  if (!newVal) return setForm({...form, reviewed_by: null});
-                  if (typeof newVal === 'string') return setForm({...form, reviewed_by: newVal});
-                  return setForm({...form, reviewed_by: newVal.id});
+                  if (!newVal) return setForm((prev: any) => ({ ...prev, reviewed_by: null }));
+                  if (typeof newVal === 'string') return setForm((prev: any) => ({ ...prev, reviewed_by: newVal }));
+                  return setForm((prev: any) => ({ ...prev, reviewed_by: newVal.id }));
                 }}
                 renderInput={(params) => <TextField {...params} label="Reviewed By" />}
               />
@@ -458,14 +468,23 @@ const CheckVouchers: React.FC = () => {
                 getOptionLabel={(opt:any) => typeof opt === 'string' ? opt : (opt && opt.label) || ''}
                 value={(() => {
                   const v = form.approved_by;
-                  if (!v && v !== 0) return '';
+                  if (v === null || v === undefined || v === '') return '';
                   if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
                   return v;
                 })()}
+                inputValue={(() => {
+                  const v = form.approved_by;
+                  if (v === null || v === undefined || v === '') return '';
+                  if (!isNaN(Number(v))) return userNames[String(v)] || String(v);
+                  return v;
+                })()}
+                onInputChange={(_, newInput) => {
+                  setForm((prev: any) => ({ ...prev, approved_by: newInput }));
+                }}
                 onChange={(_, newVal) => {
-                  if (!newVal) return setForm({...form, approved_by: null});
-                  if (typeof newVal === 'string') return setForm({...form, approved_by: newVal});
-                  return setForm({...form, approved_by: newVal.id});
+                  if (!newVal) return setForm((prev: any) => ({ ...prev, approved_by: null }));
+                  if (typeof newVal === 'string') return setForm((prev: any) => ({ ...prev, approved_by: newVal }));
+                  return setForm((prev: any) => ({ ...prev, approved_by: newVal.id }));
                 }}
                 renderInput={(params) => <TextField {...params} label="Approved By" />}
               />
