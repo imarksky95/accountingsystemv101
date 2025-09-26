@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5000';
+// Revert to the original production API base by default; can be overridden with REACT_APP_API_BASE
+const API_BASE = process.env.REACT_APP_API_BASE || 'https://accountingsystemv101-1.onrender.com';
 const API_URL = `${API_BASE.replace(/\/$/, '')}/api/auth`;
 
 export async function register(
