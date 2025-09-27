@@ -65,12 +65,31 @@ const CheckVouchers: React.FC = () => {
     setEditing(null);
     // seed current user into userNames cache when available
     let currentUserId: number | null = null;
+    let reviewerVal: any = null;
+    let approverVal: any = null;
     try {
       const token = localStorage.getItem('token');
       const meResp = await axios.get(buildUrl('/api/auth/me'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (meResp && meResp.data && meResp.data.user_id) {
         currentUserId = meResp.data.user_id;
         setUserNames(prev => ({ ...prev, [String(meResp.data.user_id)]: meResp.data.full_name || meResp.data.username || String(meResp.data.user_id) }));
+        // pull reviewer/approver from workflow
+        if (meResp.data.reviewer_id) reviewerVal = meResp.data.reviewer_id; else if (meResp.data.reviewer_manual) reviewerVal = meResp.data.reviewer_manual;
+        if (meResp.data.approver_id) approverVal = meResp.data.approver_id; else if (meResp.data.approver_manual) approverVal = meResp.data.approver_manual;
+        // resolve numeric names if needed
+        try {
+          const idsToResolve: string[] = [];
+          if (reviewerVal && !isNaN(Number(reviewerVal))) idsToResolve.push(String(reviewerVal));
+          if (approverVal && !isNaN(Number(approverVal))) idsToResolve.push(String(approverVal));
+          for (const id of Array.from(new Set(idsToResolve))) {
+            if (!userNames[id]) {
+              try {
+                const r = await axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+                if (r && r.data) setUserNames(prev => ({ ...prev, [id]: r.data.full_name || r.data.username || id }));
+              } catch (e) { /* ignore */ }
+            }
+          }
+        } catch (_) {}
       }
     } catch (e) {}
     setForm({
@@ -82,8 +101,8 @@ const CheckVouchers: React.FC = () => {
       mode: 'single',
       check_lines: [],
       prepared_by: currentUserId,
-      reviewed_by: null,
-      approved_by: null,
+      reviewed_by: reviewerVal,
+      approved_by: approverVal,
       paid_through: 'Bank',
       status: 'Draft'
     });
@@ -94,13 +113,28 @@ const CheckVouchers: React.FC = () => {
   const openEdit = async (cv:any) => {
     await Promise.all([fetchContacts(), fetchCoas(), fetchUserOptions()]);
     setEditing(cv);
+    // Load current user to fallback reviewer/approver if CV missing values
+    let me: any = null;
+    try {
+      const token = localStorage.getItem('token');
+      const meResp = await axios.get(buildUrl('/api/auth/me'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (meResp && meResp.data) me = meResp.data;
+    } catch (_) {}
+
+    const reviewerValue = (cv.reviewer_id ?? cv.reviewed_by ?? cv.reviewer_manual ?? cv.reviewed_by_manual ?? null) ?? null;
+    const approverValue = (cv.approver_id ?? cv.approved_by ?? cv.approver_manual ?? cv.approved_by_manual ?? null) ?? null;
+    const resolvedReviewer = reviewerValue != null && reviewerValue !== '' ? reviewerValue : (me ? (me.reviewer_id ?? me.reviewer_manual ?? null) : null);
+    const resolvedApprover = approverValue != null && approverValue !== '' ? approverValue : (me ? (me.approver_id ?? me.approver_manual ?? null) : null);
+
     setForm({
       ...cv,
       cvoucher_date: cv.cvoucher_date && typeof cv.cvoucher_date === 'string' && cv.cvoucher_date.indexOf('T') !== -1 ? cv.cvoucher_date.slice(0,10) : cv.cvoucher_date,
       payment_lines: (cv.payment_lines && cv.payment_lines.length) ? cv.payment_lines.map((pl:any)=>({ payee_contact_id: pl.payee_contact_id, payee_display: pl.payee_display, description: pl.description, amount: pl.amount })) : [ emptyPaymentLine() ],
       journal_lines: (cv.journal_lines && cv.journal_lines.length) ? cv.journal_lines.map((jl:any)=>({ coa_id: jl.coa_id, debit: jl.debit, credit: jl.credit, remarks: jl.remarks })) : [ emptyJournalLine(), emptyJournalLine() ],
       mode: cv.multiple_checks ? 'multi' : 'single',
-      check_lines: cv.check_lines && cv.check_lines.length ? cv.check_lines.map((cl:any)=>({ check_date: cl.check_date, check_number: cl.check_number, check_amount: cl.check_amount, check_subpayee: cl.check_subpayee })) : []
+      check_lines: cv.check_lines && cv.check_lines.length ? cv.check_lines.map((cl:any)=>({ check_date: cl.check_date, check_number: cl.check_number, check_amount: cl.check_amount, check_subpayee: cl.check_subpayee })) : [],
+      reviewed_by: resolvedReviewer,
+      approved_by: resolvedApprover
     });
     setOpen(true);
     // seed signatory names cache for prepared/reviewed/approved if numeric IDs
@@ -108,7 +142,7 @@ const CheckVouchers: React.FC = () => {
       const token = localStorage.getItem('token');
       const toResolve: string[] = [];
       const maybe = (v:any) => (v !== undefined && v !== null) ? v : '';
-      const vals = [maybe(cv.prepared_by), maybe(cv.prepared_by_manual), maybe(cv.reviewed_by), maybe(cv.reviewed_by_manual), maybe(cv.approved_by), maybe(cv.approved_by_manual)];
+      const vals = [maybe(cv.prepared_by), maybe(cv.prepared_by_manual), maybe(resolvedReviewer), maybe(cv.reviewed_by_manual), maybe(resolvedApprover), maybe(cv.approved_by_manual)];
       for (const v of vals) {
         if (v && !isNaN(Number(v))) toResolve.push(String(v));
       }
@@ -266,11 +300,41 @@ const CheckVouchers: React.FC = () => {
                     <div style={{marginTop:4}}>
                       <Button size="small" onClick={() => openEdit(cv)} sx={{mr:1}}>Edit</Button>
                       <Button size="small" onClick={async () => {
-                        // Try fetch full server item then open preview
+                        // Try fetch full server item then open enriched preview, ensuring signatory names are resolved
                         try {
                           const token = localStorage.getItem('token');
                           const r = await axios.get(buildUrl(`/api/check-vouchers/${cv.check_voucher_id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-                          setPreviewItem(r && r.data ? r.data : cv);
+                          const base = r && r.data ? r.data : cv;
+                          const enriched = { ...base } as any;
+                          // Resolve user names for numeric IDs if names missing
+                          const fetchedNames: Record<string,string> = {};
+                          const maybe = (v:any) => (v !== undefined && v !== null) ? v : '';
+                          const ids: string[] = [];
+                          const collect = (val:any) => { const m = parseSignatoryValue(val); if (m && m.length) ids.push(...m); };
+                          collect(maybe(enriched.prepared_by) || maybe(enriched.prepared_by_manual));
+                          collect(maybe(enriched.reviewed_by) || maybe(enriched.reviewer_id) || maybe(enriched.reviewed_by_manual) || maybe(enriched.reviewer_manual));
+                          collect(maybe(enriched.approved_by) || maybe(enriched.approver_id) || maybe(enriched.approved_by_manual) || maybe(enriched.approver_manual));
+                          const idsToFetch = Array.from(new Set(ids.filter(id => id && !userNames[id])));
+                          if (idsToFetch.length) {
+                            await Promise.all(idsToFetch.map(async id => {
+                              try { const ur = await axios.get(buildUrl(`/api/users/${id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} }); if (ur && ur.data) fetchedNames[id] = ur.data.full_name || ur.data.username || id; } catch (_) {}
+                            }));
+                            if (Object.keys(fetchedNames).length) setUserNames(prev => ({ ...prev, ...fetchedNames }));
+                          }
+                          // Attach name fields when missing
+                          if (!enriched.prepared_by_name) {
+                            const vals = parseSignatoryValue(enriched.prepared_by || enriched.prepared_by_manual || '');
+                            enriched.prepared_by_name = (vals[0] && (userNames[vals[0]] || fetchedNames[vals[0]])) || enriched.prepared_by_manual || '';
+                          }
+                          if (!enriched.reviewed_by_name) {
+                            const vals = parseSignatoryValue(enriched.reviewed_by || enriched.reviewer_id || enriched.reviewed_by_manual || enriched.reviewer_manual || '');
+                            enriched.reviewed_by_name = (vals[0] && (userNames[vals[0]] || fetchedNames[vals[0]])) || enriched.reviewed_by_manual || enriched.reviewer_manual || '';
+                          }
+                          if (!enriched.approved_by_name) {
+                            const vals = parseSignatoryValue(enriched.approved_by || enriched.approver_id || enriched.approved_by_manual || enriched.approver_manual || '');
+                            enriched.approved_by_name = (vals[0] && (userNames[vals[0]] || fetchedNames[vals[0]])) || enriched.approved_by_manual || enriched.approver_manual || '';
+                          }
+                          setPreviewItem(enriched);
                         } catch (e) { setPreviewItem(cv); }
                         setPreviewOpen(true);
                       }}>Preview</Button>

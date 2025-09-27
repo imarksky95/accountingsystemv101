@@ -11,10 +11,11 @@ A consolidated SQL file is available at `database/all_migrations.sql`. To run th
 1. Create a `.env` in the repo root with your DB connection details:
 
 ```
-DB_HOST=localhost
-DB_USER=root
-DB_PASS=yourpassword
-DB_NAME=accountingsystem
+DB_HOST=148.222.53.12
+DB_USER=u325151658_markchrc
+DB_PASS=Mark_082020
+DB_NAME=u325151658_accounting_db
+JWT_SECRET=your_jwt_secret_here
 ```
 
 2. Run the migrations:
