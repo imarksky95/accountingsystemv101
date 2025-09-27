@@ -89,6 +89,14 @@ CREATE TABLE IF NOT EXISTS check_vouchers (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- 20250927: add signatory columns to check_vouchers (id + manual) and deprecate check_fr/check_to usage
+ALTER TABLE IF EXISTS check_vouchers ADD COLUMN IF NOT EXISTS prepared_by INT NULL;
+ALTER TABLE IF EXISTS check_vouchers ADD COLUMN IF NOT EXISTS prepared_by_manual VARCHAR(255) NULL;
+ALTER TABLE IF EXISTS check_vouchers ADD COLUMN IF NOT EXISTS reviewer_id INT NULL;
+ALTER TABLE IF EXISTS check_vouchers ADD COLUMN IF NOT EXISTS reviewer_manual VARCHAR(255) NULL;
+ALTER TABLE IF EXISTS check_vouchers ADD COLUMN IF NOT EXISTS approver_id INT NULL;
+ALTER TABLE IF EXISTS check_vouchers ADD COLUMN IF NOT EXISTS approver_manual VARCHAR(255) NULL;
+
 -- scheduled_payments and reports (omitted for brevity in this consolidated file - use ap-management.sql directly if needed)
 
 -- 3) Contacts

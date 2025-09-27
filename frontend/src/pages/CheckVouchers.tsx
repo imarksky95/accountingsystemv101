@@ -3,6 +3,7 @@ import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextFie
 import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
 import { tryFetchWithFallback, buildUrl } from '../apiBase';
+import { formatDateToMMDDYYYY } from '../utils/date';
 
 type PaymentLine = { payee_contact_id?: number | null; payee_display?: string; description?: string; amount?: number | string };
 type JournalLine = { coa_id?: number | string | null; debit?: number | string; credit?: number | string; remarks?: string };
@@ -306,6 +307,13 @@ const CheckVouchers: React.FC = () => {
                           const r = await axios.get(buildUrl(`/api/check-vouchers/${cv.check_voucher_id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
                           const base = r && r.data ? r.data : cv;
                           const enriched = { ...base } as any;
+                          // If server did not attach company, try client-side best-effort
+                          if (!enriched.company) {
+                            try {
+                              const cr = await tryFetchWithFallback('/api/company-profile', { cache: 'no-store' });
+                              if (cr.ok) enriched.company = await cr.json();
+                            } catch (_) {}
+                          }
                           // Resolve user names for numeric IDs if names missing
                           const fetchedNames: Record<string,string> = {};
                           const maybe = (v:any) => (v !== undefined && v !== null) ? v : '';
@@ -333,6 +341,32 @@ const CheckVouchers: React.FC = () => {
                           if (!enriched.approved_by_name) {
                             const vals = parseSignatoryValue(enriched.approved_by || enriched.approver_id || enriched.approved_by_manual || enriched.approver_manual || '');
                             enriched.approved_by_name = (vals[0] && (userNames[vals[0]] || fetchedNames[vals[0]])) || enriched.approved_by_manual || enriched.approver_manual || '';
+                          }
+                          // If still missing any names, fall back to current user's workflow settings
+                          if (!enriched.prepared_by_name || !enriched.reviewed_by_name || !enriched.approved_by_name) {
+                            try {
+                              const meR = await axios.get(buildUrl('/api/auth/me'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+                              const me = meR && meR.data ? meR.data : null;
+                              if (me) {
+                                if (!enriched.prepared_by_name) enriched.prepared_by_name = me.full_name || me.username || '';
+                                const resolveIdToName = async (id:any) => {
+                                  if (id && !isNaN(Number(id))) {
+                                    const sid = String(id);
+                                    if (userNames[sid]) return userNames[sid];
+                                    try { const ur = await axios.get(buildUrl(`/api/users/${sid}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} }); return ur && ur.data ? (ur.data.full_name || ur.data.username || sid) : sid; } catch { return sid; }
+                                  }
+                                  return String(id || '');
+                                };
+                                if (!enriched.reviewed_by_name) {
+                                  const rv = me.reviewer_id || me.reviewer_manual || '';
+                                  enriched.reviewed_by_name = await resolveIdToName(rv);
+                                }
+                                if (!enriched.approved_by_name) {
+                                  const av = me.approver_id || me.approver_manual || '';
+                                  enriched.approved_by_name = await resolveIdToName(av);
+                                }
+                              }
+                            } catch (_) {}
                           }
                           setPreviewItem(enriched);
                         } catch (e) { setPreviewItem(cv); }
@@ -580,7 +614,7 @@ const CheckVouchers: React.FC = () => {
               <div style={{display:'flex', justifyContent:'space-between', marginTop:10}}>
                 <div>
                   <div><strong>CV Ctrl:</strong> {previewItem.check_voucher_control || previewItem.check_voucher_id}</div>
-                  <div><strong>Prepared:</strong> {previewItem.cvoucher_date}</div>
+                  <div><strong>Prepared:</strong> {formatDateToMMDDYYYY(previewItem.cvoucher_date)}</div>
                   <div><strong>Purpose:</strong> {previewItem.purpose}</div>
                 </div>
                 <div style={{textAlign:'right'}}>

@@ -374,12 +374,17 @@ router.post('/', async (req, res) => {
   const check_amount = body.check_amount || body.amount || null;
   const cvoucher_status = body.cvoucher_status || body.status || null;
   const multiple_checks = body.multiple_checks || body.multiple_checks === 1 || body.mode === 'multi' ? 1 : 0;
-  const check_fr = body.check_fr || null;
-  const check_to = body.check_to || null;
   const coa_id = body.coa_id || null;
   const payment_lines = body.payment_lines || [];
   const check_lines = body.check_lines || [];
   const journal_lines = body.journal_lines || [];
+  // Signatories from body (id or manual). Frontend sends reviewer_id/approver_id plus legacy reviewed_by/approved_by; prefer the explicit *_id/manual pairs
+  const prepared_by = body.prepared_by || null;
+  const prepared_by_manual = body.prepared_by_manual || null;
+  const reviewer_id = body.reviewer_id || body.reviewed_by || null;
+  const reviewer_manual = body.reviewer_manual || body.reviewed_by_manual || null;
+  const approver_id = body.approver_id || body.approved_by || null;
+  const approver_manual = body.approver_manual || body.approved_by_manual || null;
   const dbPool = getDbPool(req);
   let conn;
   try {
@@ -398,9 +403,13 @@ router.post('/', async (req, res) => {
     const [countRows] = await conn.execute('SELECT COUNT(*) as count FROM check_vouchers');
     const check_voucher_control = `CV-${countRows[0].count + 1}`;
 
-  const params = [check_voucher_control, cvoucher_date || null, purpose || null, check_payee || null, check_no || null, check_amount || null, cvoucher_status || null, multiple_checks ? 1 : 0, check_fr || null, check_to || null, coa_id || null];
+  const params = [
+      check_voucher_control, cvoucher_date || null, purpose || null, check_payee || null, check_no || null, check_amount || null,
+      cvoucher_status || null, multiple_checks ? 1 : 0, /* check_fr removed */ null, /* check_to removed */ null, coa_id || null,
+      prepared_by || null, prepared_by_manual || null, reviewer_id || null, reviewer_manual || null, approver_id || null, approver_manual || null
+    ];
     const [result] = await conn.execute(
-      'INSERT INTO check_vouchers (check_voucher_control, cvoucher_date, purpose, check_payee, check_no, check_amount, cvoucher_status, multiple_checks, check_fr, check_to, coa_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO check_vouchers (check_voucher_control, cvoucher_date, purpose, check_payee, check_no, check_amount, cvoucher_status, multiple_checks, check_fr, check_to, coa_id, prepared_by, prepared_by_manual, reviewer_id, reviewer_manual, approver_id, approver_manual) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       params
     );
     const insertId = result.insertId;
@@ -461,12 +470,16 @@ router.put('/:id', async (req, res) => {
   const check_amount = body.check_amount || body.amount || null;
   const cvoucher_status = body.cvoucher_status || body.status || null;
   const multiple_checks = body.multiple_checks || body.multiple_checks === 1 || body.mode === 'multi' ? 1 : 0;
-  const check_fr = body.check_fr || null;
-  const check_to = body.check_to || null;
   const coa_id = body.coa_id || null;
   const payment_lines = body.payment_lines || [];
   const check_lines = body.check_lines || [];
   const journal_lines = body.journal_lines || [];
+  const prepared_by = body.prepared_by || null;
+  const prepared_by_manual = body.prepared_by_manual || null;
+  const reviewer_id = body.reviewer_id || body.reviewed_by || null;
+  const reviewer_manual = body.reviewer_manual || body.reviewed_by_manual || null;
+  const approver_id = body.approver_id || body.approved_by || null;
+  const approver_manual = body.approver_manual || body.approved_by_manual || null;
   const dbPool = getDbPool(req);
   let conn;
   try {
@@ -482,8 +495,8 @@ router.put('/:id', async (req, res) => {
     await conn.beginTransaction();
 
     await conn.execute(
-      'UPDATE check_vouchers SET cvoucher_date=?, purpose=?, check_payee=?, check_no=?, check_amount=?, cvoucher_status=?, multiple_checks=?, check_fr=?, check_to=?, coa_id=?, updated_at = CURRENT_TIMESTAMP WHERE check_voucher_id=?',
-      [cvoucher_date || null, purpose || null, check_payee || null, check_no || null, check_amount || null, cvoucher_status || null, multiple_checks ? 1 : 0, check_fr || null, check_to || null, coa_id || null, id]
+      'UPDATE check_vouchers SET cvoucher_date=?, purpose=?, check_payee=?, check_no=?, check_amount=?, cvoucher_status=?, multiple_checks=?, check_fr=NULL, check_to=NULL, coa_id=?, prepared_by=?, prepared_by_manual=?, reviewer_id=?, reviewer_manual=?, approver_id=?, approver_manual=?, updated_at = CURRENT_TIMESTAMP WHERE check_voucher_id=?',
+      [cvoucher_date || null, purpose || null, check_payee || null, check_no || null, check_amount || null, cvoucher_status || null, multiple_checks ? 1 : 0, coa_id || null, prepared_by || null, prepared_by_manual || null, reviewer_id || null, reviewer_manual || null, approver_id || null, approver_manual || null, id]
     );
 
     // Replace lines by deleting existing ones and inserting new
