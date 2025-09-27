@@ -1,11 +1,11 @@
 {
   "files": {
     "main.css": "/accountingsystemv101/static/css/main.6f437ae8.css",
-    "main.js": "/accountingsystemv101/static/js/main.ad8cbbf2.js",
+    "main.js": "/accountingsystemv101/static/js/main.125c8f1f.js",
     "static/js/511.94d3c4ab.chunk.js": "/accountingsystemv101/static/js/511.94d3c4ab.chunk.js",
     "static/js/114.0431fe31.chunk.js": "/accountingsystemv101/static/js/114.0431fe31.chunk.js",
     "static/js/648.c243aa50.chunk.js": "/accountingsystemv101/static/js/648.c243aa50.chunk.js",
-    "static/js/46.103d1ed8.chunk.js": "/accountingsystemv101/static/js/46.103d1ed8.chunk.js",
+    "static/js/46.5c95fc5d.chunk.js": "/accountingsystemv101/static/js/46.5c95fc5d.chunk.js",
     "static/js/331.001faace.chunk.js": "/accountingsystemv101/static/js/331.001faace.chunk.js",
     "static/js/668.574b8cc1.chunk.js": "/accountingsystemv101/static/js/668.574b8cc1.chunk.js",
     "static/js/928.ab094466.chunk.js": "/accountingsystemv101/static/js/928.ab094466.chunk.js",
@@ -26,11 +26,11 @@
     "static/js/741.f628c249.chunk.js": "/accountingsystemv101/static/js/741.f628c249.chunk.js",
     "index.html": "/accountingsystemv101/index.html",
     "main.6f437ae8.css.map": "/accountingsystemv101/static/css/main.6f437ae8.css.map",
-    "main.ad8cbbf2.js.map": "/accountingsystemv101/static/js/main.ad8cbbf2.js.map",
+    "main.125c8f1f.js.map": "/accountingsystemv101/static/js/main.125c8f1f.js.map",
     "511.94d3c4ab.chunk.js.map": "/accountingsystemv101/static/js/511.94d3c4ab.chunk.js.map",
     "114.0431fe31.chunk.js.map": "/accountingsystemv101/static/js/114.0431fe31.chunk.js.map",
     "648.c243aa50.chunk.js.map": "/accountingsystemv101/static/js/648.c243aa50.chunk.js.map",
-    "46.103d1ed8.chunk.js.map": "/accountingsystemv101/static/js/46.103d1ed8.chunk.js.map",
+    "46.5c95fc5d.chunk.js.map": "/accountingsystemv101/static/js/46.5c95fc5d.chunk.js.map",
     "331.001faace.chunk.js.map": "/accountingsystemv101/static/js/331.001faace.chunk.js.map",
     "668.574b8cc1.chunk.js.map": "/accountingsystemv101/static/js/668.574b8cc1.chunk.js.map",
     "928.ab094466.chunk.js.map": "/accountingsystemv101/static/js/928.ab094466.chunk.js.map",
@@ -52,6 +52,6 @@
   },
   "entrypoints": [
     "static/css/main.6f437ae8.css",
-    "static/js/main.ad8cbbf2.js"
+    "static/js/main.125c8f1f.js"
   ]
 }
